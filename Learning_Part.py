@@ -327,7 +327,7 @@ def train(env):
 
     # The episode loop
     # 에피소드 루프 정의
-    for i_episode in xrange(options.MAX_EPISODE): #MAX_EPISODE는 3000번의 정의 되어있음. 3000번 까지 play
+    for i_episode in range(options.MAX_EPISODE): #MAX_EPISODE는 3000번의 정의 되어있음. 3000번 까지 play
 
         observation = env.reset() #OpenAi Gym. observation을 reset해주고
         obs2 = np.reshape(observation, (1, -1))
@@ -423,7 +423,7 @@ def train(env):
                 # feed를 먹이고 loss함수를 가지고 train_step을 진행. 그 값을 step_loss_value로 저장한다
 
         #step loop 종료
-        print "====== Episode {} ended with score = {}, avg_loss = {} ======".\
+        print("====== Episode {} ended with score = {}, avg_loss = {} ======")
             format(i_episode+1, score, sum_loss_value / score)
 
         VAL_SUM += score
