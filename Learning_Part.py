@@ -424,7 +424,7 @@ def train(env):
 
         #step loop 종료
         print("====== Episode {} ended with score = {}, avg_loss = {} ======")
-            format(i_episode+1, score, sum_loss_value / score)
+            .format(i_episode+1, score, sum_loss_value / score)
 
         VAL_SUM += score
         graph = plt.scatter(i_episode+1 ,score)

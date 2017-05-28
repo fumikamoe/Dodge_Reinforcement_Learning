@@ -2,7 +2,7 @@
 import win32gui
 import win32api
 import win32con
-import os
+import re
 import numpy as np
 import cv2
 from mss import mss
@@ -26,17 +26,13 @@ def gamestart():
     win32api.keybd_event(0x0D, 0, 0, 0)
     time.sleep(.05)
     win32api.keybd_event(0x0D, 0, win32con.KEYEVENTF_KEYUP, 0)
-    start_time = datetime.datetime.now()
-    return start_time
 
 def gamedone(start_time):
-    time_buffer2 = datetime.datetime.now()
-    #print(time_buffer2 - start_time)
     win32api.keybd_event(0x4E, 0, 0, 0)
     time.sleep(.05)
     win32api.keybd_event(0x4E, 0, win32con.KEYEVENTF_KEYUP, 0)
 
-def init_game_status():
+def init_game_window_status():
     window_name = win32gui.FindWindow(None, TARGET_NAME)
     left, top, right, bot, = win32gui.GetWindowRect(window_name)
     w = right - left
@@ -82,38 +78,48 @@ def Convert_BW(img,threhold):
     bw[bw >= threhold] = 255
     return bw
 
-while 1:
-    gameWindow = init_game_status()
+def find_score(hwnd):
+    hwnd = win32gui.FindWindowEx(hwnd, 0, "static", None)
+    score_text = win32gui.GetWindowText(hwnd) #Text를 뽑아낸다
+    start = score_text.index('(') # slicing start
+    end = score_text.index(')') # Slicing end
+    score_text = score_text[start+2:end-2] #Score부분만 Slicing
+    return float(score_text) # float 값으로 리턴한다
+
+
+def Game_env(action_input):
+    reward = 0
+    done = False
+    _ = None
+
+    gameWindow = init_game_window_status()
     sct = mss()
     sct.get_pixels(gameWindow)
     img = Image.frombytes('RGB', (sct.width, sct.height), sct.image)
     img = Convert_BW(img,200)
     img = np.array(img)
+    Result_screen = win32gui.FindWindow(None, '닷지')
 
+    observation = img #return observation data
 
-    if win32gui.FindWindow(None,'닷지') == False:
+    if Result_screen == False:
+        action(action_input)
         cv2.imshow('test', img)
         #print(img)
-        print(img.shape)
-        print(np.reshape(img, (1, -1)).shape)
+        #print(img.shape)
+        #print(np.reshape(img, (1, -1)).shape)
 
-    if win32gui.FindWindow(None,'닷지'):
+    if Result_screen:
         print("Game Over!")
+        reward = find_score(Result_screen)
         gamedone(start_time=None)
         time.sleep(.05)
-        win32api.keybd_event(0x0D, 0, 0, 0)
+        #win32api.keybd_event(0x0D, 0, 0, 0)
         time.sleep(.05)
-        win32api.keybd_event(0x0D, 0, win32con.KEYEVENTF_KEYUP, 0)
-
+        #win32api.keybd_event(0x0D, 0, win32con.KEYEVENTF_KEYUP, 0)
         gamestart()
+        done = True
 
-        #cv2.destroyAllWindows()
-        #break
-
-    if cv2.waitKey(25) & 0xFF == ord('q'):
-        cv2.destroyAllWindows()
-        break
-
-    control_rand = np.random.random_integers(0, 3, None)
-    #
-    # action(control_rand)
+    #control_rand = np.random.random_integers(0, 3, None)
+    #action(control_rand)
+    return observation, reward, done, _
