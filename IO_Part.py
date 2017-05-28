@@ -21,24 +21,23 @@ CONTROL = {'Left':0x25,
            'Right':0x27,
            'Down':0x28}
 
+def init():
+    window_name = win32gui.FindWindow(None, TARGET_NAME)
+    left, top, right, bot, = win32gui.GetWindowRect(window_name)
+    w = right - left
+    h = bot - top
+    gameWindow = {'top': top+45, 'left': left, 'width': w, 'height': h-45}
+    return gameWindow
 
 def gamestart():
     win32api.keybd_event(0x0D, 0, 0, 0)
     time.sleep(.05)
     win32api.keybd_event(0x0D, 0, win32con.KEYEVENTF_KEYUP, 0)
 
-def gamedone(start_time):
+def gamedone():
     win32api.keybd_event(0x4E, 0, 0, 0)
     time.sleep(.05)
     win32api.keybd_event(0x4E, 0, win32con.KEYEVENTF_KEYUP, 0)
-
-def init_game_window_status():
-    window_name = win32gui.FindWindow(None, TARGET_NAME)
-    left, top, right, bot, = win32gui.GetWindowRect(window_name)
-    w = right - left
-    h = bot - top
-    gameWindow = {'top': top+45, 'left': left, 'width': w, 'height': h-45}
-    return gameWindow #def end
 
 def action(input):
     if input == 0:
@@ -69,14 +68,12 @@ def action(input):
         print("Down")
         # time.sleep(.005)
 
-#def end
+    if input == 100:
+        win32api.keybd_event(0x0D, 0, 0, 0)
+        time.sleep(.05)
+        win32api.keybd_event(0x0D, 0, win32con.KEYEVENTF_KEYUP, 0)
 
-def Convert_BW(img,threhold):
-    img = img.convert('L')
-    bw = np.asarray(img).copy()
-    bw[bw < threhold] = 0
-    bw[bw >= threhold] = 255
-    return bw
+#def end
 
 def find_score(hwnd):
     hwnd = win32gui.FindWindowEx(hwnd, 0, "static", None)
@@ -87,24 +84,55 @@ def find_score(hwnd):
     return float(score_text) # float 값으로 리턴한다
 
 
+def Activating():
+    active_window = win32gui.GetForegroundWindow()
+    active_window = win32gui.GetWindowText(active_window)
+    if active_window == TARGET_NAME or active_window == "닷지":
+        active_status = True
+    else :
+        active_status = False
+        print("Game is not Activated!!!!")
+
+    return active_status
+
+def reset_env():
+    Result_screen = win32gui.FindWindow(None, '닷지')
+
+    if Result_screen:
+        gamedone()
+        time.sleep(.05)
+
+        action(100)
+        time.sleep(.05)
+        action(100)
+
+    if Result_screen == False:
+        action(100)
+        time.sleep(.05)
+        action(100)
+    done = False
+    return done
+
 def Game_env(action_input):
     reward = 0
     done = False
     _ = None
+    gameWindow = init()
 
-    gameWindow = init_game_window_status()
     sct = mss()
     sct.get_pixels(gameWindow)
-    img = Image.frombytes('RGB', (sct.width, sct.height), sct.image)
-    img = Convert_BW(img,200)
-    img = np.array(img)
-    Result_screen = win32gui.FindWindow(None, '닷지')
+    img = Image.frombytes('L', (sct.width, sct.height), sct.image)
+    bw = np.asarray(img).copy()
+    bw[bw < 200] = 0
+    bw[bw >= 200] = 255
+    img = np.array(bw)
 
     observation = img #return observation data
 
+    Result_screen = win32gui.FindWindow(None, '닷지')
+
     if Result_screen == False:
         action(action_input)
-        cv2.imshow('test', img)
         #print(img)
         #print(img.shape)
         #print(np.reshape(img, (1, -1)).shape)
@@ -112,14 +140,33 @@ def Game_env(action_input):
     if Result_screen:
         print("Game Over!")
         reward = find_score(Result_screen)
-        gamedone(start_time=None)
+        #gamedone()
         time.sleep(.05)
         #win32api.keybd_event(0x0D, 0, 0, 0)
         time.sleep(.05)
         #win32api.keybd_event(0x0D, 0, win32con.KEYEVENTF_KEYUP, 0)
-        gamestart()
+        #gamestart()
         done = True
 
-    #control_rand = np.random.random_integers(0, 3, None)
-    #action(control_rand)
+
     return observation, reward, done, _
+
+done = False
+time.sleep(5)
+
+while 1:
+    if Activating():
+        time.sleep(2)
+        done = reset_env()
+        step = 0
+        while done == False:
+            control_rand = np.random.random_integers(0, 3, None)
+            obs, reward, done, _ = Game_env(control_rand)
+            step += 1
+            print("-----------------------------------")
+            print("step is {}".format(step))
+            print("action : {}".format(control_rand))
+            print("Observation : {}".format(obs))
+            print("Reward : {}".format(reward))
+            print("done : {}".format(done))
+            print("-----------------------------------")
