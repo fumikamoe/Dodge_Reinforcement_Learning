@@ -225,26 +225,18 @@ class QAgent:
 # 실제적인 학습 부분
 
 def train(env):
-
     # Define placeholders to catch inputs and add options
     options = get_options() # 위에서 정의한 get_options()를 통해 옵션을 정의함
-
     agent = QAgent(options) # QAgent class를 생성하여 agent라는 이름으로 넣음
-
     sess = tf.InteractiveSession() # Interactive Session을 생성
-
     obs, Q1 = agent.add_value_net(options) # Observation을 넣으면 Q value가 나오는 함수 add_value_net 형태만 지정해줌
-
     act = tf.placeholder(tf.float32, [None, options.ACTION_DIM]) #float32 타입으로 ACTION_DIM 크기로 action 크기 결정
     rwd = tf.placeholder(tf.float32, [None, ]) # reward 크기 결정
-
     next_obs, Q2 = agent.add_value_net(options) # Observation을 넣으면 Q value가 나오는 함수 add_value_net 형태만 지정해줌. Q1과 같은 형태
-
     values1 = tf.reduce_sum(tf.multiply(Q1, act), reduction_indices=1)
     values2 = rwd + options.GAMMA * tf.reduce_max(Q2, reduction_indices=1)
     # reduction_indices=1 는 행끼리 처리하라는 reduce 연산의 옵션
     loss = tf.reduce_mean(tf.square(values1 - values2))
-
     '''
     [Deep Q Learning with Experience Replay]
     Neural Network를 update할 때에는 특정 기준으로 update를 하는데 그 기준이 loss fuction.
@@ -252,7 +244,6 @@ def train(env):
     한 번 update하는데  training set 256를 사용. 256개의 value 1과 value 2를 계산하는데
     value 2안에 max가 들어가있음. 256개의 value 1과 value 2의 차이의 제곱의 평균이 loss function으로 정의됩니다.
     '''
-
     train_step = tf.train.AdamOptimizer(options.LR).minimize(loss)
     '''
     Neural Networks의 parameter를 update하는 방법은 back Propagation. 그 정도를 정하는게 optimizer.
@@ -276,7 +267,6 @@ def train(env):
         print("Successfully loaded:", checkpoint.model_checkpoint_path)
     else:
         print("Could not find old network weights")
-
     '''
     모델을 저장하고 복구하기 위한 가장 쉬운 방법은 tf.train.Saver 오브젝트를 이용하는 것.
     이 오브젝트를 통해 그래프 전체 변수 또는 그래프의 지정된 리스트의 변수에 save와 restore 오퍼레이션(op)을 추가할 수 있음
@@ -285,18 +275,12 @@ def train(env):
     saver.restore(sess, "/tmp/model.ckpt")
     같은 식으로 사용
     '''
-
     #로컬 변수에 대한 초기화 및 정의
     feed = {}
     eps = options.INIT_EPS
-
     global_step = 0 # global step 정의 및 초기화
-
     exp_pointer = 0 # queue의 순서를 나타내는 포인터
-
     learning_finished = False
-
-    VAL_SUM = 0
     '''
     experience reply를 할때 같은 episode안에서 순서대로 학습하면 편향되는 효과를 가짐
     MAX_EXPRIENCE를 정의하고(2000번) 거기에 training set을 하나씩 저장해서 랜덤으로 256개를 추출하여 학습
@@ -311,33 +295,28 @@ def train(env):
     # Score cache
     score_queue = []
 
-    # The episode loop
     # 에피소드 루프 정의
     for i_episode in range(options.MAX_EPISODE): #MAX_EPISODE는 3000번의 정의 되어있음. 3000번 까지 play
 
-        #observation = env.reset() #OpenAi Gym. observation을 reset해주고
         observation = game.reset_env()
         obs_to_1dim = np.reshape(observation, (1, -1)) #차원을 낮춘다
         done = False # episode가 끝나기 전까진 done = false
         score = 0
         sum_loss_value = 0
 
-        # The step loop
+        #Exp Loop
         while not done: #에피소드가 끝나지 않았다면
-
             global_step += 1 #global step을 1 더해주고
-
             if global_step % options.EPS_ANNEAL_STEPS == 0 and eps > options.FINAL_EPS:
                 #global step이 EPS_ANNEAL_STEPS를 지날때마다 그리고 엡실론이 최종 엡실론 보다 크면
                 eps = eps * options.EPS_DECAY # 엡실론에 감쇠 비율을 적용한다
             #if end
 
-            #env.render() # OpenAIGYM. 현재 상황을 렌더링해줌
+            if exp_pointer != options.MAX_EXPERIENCE:
+                obs_queue[exp_pointer] = obs_to_1dim # Observation 값을 obs_queue에 저장 exp_pointer는 큐의 순서를 지칭함
+            #if end
 
-            obs_queue[exp_pointer] = obs_to_1dim # Observation 값을 obs_queue에 저장 exp_pointer는 큐의 순서를 지칭함
-            #오래된 observation 부터 없앤다
-
-            action = agent.sample_action(Q1, {obs: obs_to_1dim}, eps, options) # <- 물어볼 것 reshape 부분
+            action = agent.sample_action(Q1, {obs: obs_to_1dim}, eps, options) #Action 추출
             '''
             action은 agent 클래스 QAgent(options) 에서 sample_action 함수를 통해서 결정
             Epsilon greedy하게 현재 observation이 DQN을 통과하여 나온 Q값을 바탕으로 action을 결정함)
@@ -348,96 +327,83 @@ def train(env):
             add_value_net는 Q Agent 초기화 부분에서 W1,B1... 등 클래스 그 자신을 가져와서 수행
             Feed는 obs에
             '''
-
-            act_queue[exp_pointer] = action
-            #action을 큐의 순서에 맞게 act_queue로 저장
-
-            #observation, reward, done, _ = env.step(np.argmax(action))
-
             observation, reward, done, _ = game.Game_env(np.argmax(action))
             #OpenAI Gym. _는 info 부분. argmax는 최대 구성요소의 인덱스를 반환합니다
+
             obs_to_1dim = np.reshape(observation, (1, -1))
 
             score += reward
             # Reward will be the accumulative score
             #episode가 끝나지 않고 step이 증가하면 reward를 +1하고 그걸 score로 저장. score는 replay memory로 들어감
-
-
-
-
-            if done and score < 30: #done이 올라오고 score가 200 이하이면
+            if done and score < 20: #done이 올라오고 score가 200 이하이면
                 reward = -500  # If it fails, punish hard
-                observation = np.zeros_like(obs_to_1dim) # 이럴 경우 observation을 0으로 초기화
+                obs_to_1dim = np.zeros_like(obs_to_1dim) # 이럴 경우 observation을 0으로 초기화
             #if end
 
             #step을 진행해도 끝나지 않으면
-            rwd_queue[exp_pointer] = reward # reward queue에 reward 값을 넣고
-            next_obs_queue[exp_pointer] = obs_to_1dim #Observation을 저장하고
-
-            exp_pointer += 1 #queue의 index pointer를 1 증가시킨다
-
-            if exp_pointer == options.MAX_EXPERIENCE: # index point가 max_exprience에 도달하면
-                exp_pointer = 0  # Refill the replay memory if it is full
-            #if end
-
-            #exprience는 초기화되고 새로운 exprience를 생성
-            if global_step >= options.MAX_EXPERIENCE: # Global step이 max_exprience의 수를 넘으면
-
-                '''
-                max_exprience가 2000개가 안넘으면 학습하지 않고 랜덤하게 경험만 쌓임.
-                n번 이상 쌓이면 그 때 부터 mini batch를 뽑아 그것을 feed로 주어 DQN을 학습한다
-                '''
-
-                rand_indexs = np.random.choice(options.MAX_EXPERIENCE, options.BATCH_SIZE)
-                #max_exprience에서 batch size만큼 랜덤으로 추출하여 rand indexs에 넣는다
-
-                feed.update({obs: obs_queue[rand_indexs]})
-                feed.update({act: act_queue[rand_indexs]})
-                feed.update({rwd: rwd_queue[rand_indexs]})
-                feed.update({next_obs: next_obs_queue[rand_indexs]})
-                #랜덤한 indexs에 따라 각각 obs,act,rwd,next obs를 update
-
-                if not learning_finished:  # If not solved, we train and get the step loss
-                    step_loss_value, _ = sess.run([loss, train_step], feed_dict=feed)
-                #if not end
-
-                else:  # If solved, we just get the step loss
-                    step_loss_value = sess.run(loss, feed_dict=feed)
-                #else end
-
-                # Use sum to calculate average loss of this episode
-                sum_loss_value += step_loss_value
-                # feed를 먹이고 loss함수를 가지고 train_step을 진행. 그 값을 step_loss_value로 저장한다
+            if exp_pointer != options.MAX_EXPERIENCE:
+                act_queue[exp_pointer] = action
+                rwd_queue[exp_pointer] = reward # reward queue에 reward 값을 넣고
+                next_obs_queue[exp_pointer] = obs_to_1dim #Observation을 저장하고
+                exp_pointer += 1 #queue의 index pointer를 1 증가시킨다
+                print(exp_pointer)
             #if end
         #step loop 종료
-
+        #Print Result
         print("====== {} ======".format(time.ctime()))
         print("====== Episode {} ended with score = {}, avg_loss = {} ======".format(i_episode+1, score, sum_loss_value / score))
 
+        #Learn Part
+        if exp_pointer == options.MAX_EXPERIENCE:
+                print("====== {} ======".format(time.ctime()))
+                print("학습을 시작합니다.")
+                for i in range(options.BATCH_SIZE):
+                    rand_indexs = np.random.choice(options.MAX_EXPERIENCE, options.BATCH_SIZE)
+                    #max_exprience에서 batch size만큼 랜덤으로 추출하여 rand indexs에 넣는다
+                    feed.update({obs: obs_queue[rand_indexs]})
+                    feed.update({act: act_queue[rand_indexs]})
+                    feed.update({rwd: rwd_queue[rand_indexs]})
+                    feed.update({next_obs: next_obs_queue[rand_indexs]})
+                    #랜덤한 indexs에 따라 각각 obs,act,rwd,next obs를 update
+                    if not learning_finished:  # If not solved, we train and get the step loss
+                        step_loss_value, _ = sess.run([loss, train_step], feed_dict=feed)
+                    #if not end
+                    # Use sum to calculate average loss of this episode
+                    sum_loss_value += step_loss_value
+                    # feed를 먹이고 loss함수를 가지고 train_step을 진행. 그 값을 step_loss_value로 저장한다
+                    if i == i / 4:
+                        print("학습 25% 완료...")
+                    if i == i / 2:
+                        print("학습 50% 완료...")
+                    if i == i * 3/4:
+                        print("학습 75% 완료...")
+                #for end
+                exp_pointer = 0 #학습 포인터 초기화
+                print("====== {} ======".format(time.ctime()))
+                print("학습 완료!")
+                saver.save(sess, './checkpoints/' + 'dqn', global_step=global_step)  # ./checkpoints/ 폴더에 저장
+                print("저장했습니다!!")  # save!라고 말함
+        #Learn Part end
 
-        score_queue.append(score) # score queue에 score를 넣고
+    #episode end
 
-        if len(score_queue) > MAX_SCORE_QUEUE_SIZE: #score_queue 사이즈가 max score queue size 보다 크면
-            score_queue.pop(0) #queue를 0으로 팝업한다
+#train end
 
-            if np.mean(score_queue) > 100: #score_queue가 195를 넘었다면
-                learning_finished = True # 풀린것으로 판정
-            else:
-                learning_finished = False # 아니라면 계속 지속한다
-
-        if learning_finished: #풀렸다면
-            print("Complete !!!") # Complete 이라고 출력한다
-
-        # save progress every 100 episodes
-        if learning_finished == 0 and i_episode % 100 == 0: #학습이 끝나지 않았고 에피소드 100번이 지나갈때마다
-            saver.save(sess, './checkpoints/'+ 'dqn', global_step = global_step) # ./checkpoints/ 폴더에 저장
-            print("save!") #save!라고 말함
 
 
 
 if __name__ == "__main__":
-
-    #env = gym.make(GAME)
     train(game)
     subprocess.call(["shutdown","/s"])
 
+'''
+score_queue.append(score) # score queue에 score를 넣고
+if len(score_queue) > MAX_SCORE_QUEUE_SIZE: #score_queue 사이즈가 max score queue size 보다 크면
+   score_queue.pop(0) #queue를 0으로 팝업한다
+   if np.mean(score_queue) > 100: #score_queue가 195를 넘었다면
+       learning_finished = True # 풀린것으로 판정
+   else:
+       learning_finished = False # 아니라면 계속 지속한다
+if learning_finished: #풀렸다면
+   print("Complete !!!") # Complete 이라고 출력한다
+'''
