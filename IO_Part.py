@@ -2,14 +2,11 @@
 import win32gui
 import win32api
 import win32con
-import re
 import numpy as np
-import cv2
 from mss import mss
 from PIL import Image
-
 import time
-import datetime
+
 
 
 TARGET_NAME = '닷지 1.9'
@@ -43,14 +40,14 @@ def gamedone(): # Key press N
 def action(input):
     if input == 0:
         win32api.keybd_event(CONTROL["Left"], 0, 0, 0)
-        time.sleep(0.1)
+        time.sleep(.1)
         win32api.keybd_event(CONTROL["Left"], 0, win32con.KEYEVENTF_KEYUP, 0)
         print("Left")
         #time.sleep(0.05)
 
     if input == 1:
         win32api.keybd_event(CONTROL["Right"], 0, 0, 0)
-        time.sleep(0.1)
+        time.sleep(.1)
         win32api.keybd_event(CONTROL["Right"], 0, win32con.KEYEVENTF_KEYUP, 0)
         print("Right")
         # time.sleep(0.05)
@@ -62,12 +59,47 @@ def action(input):
         print("Up")
         #time.sleep(.005)
 
-    if  input == 3:
-        win32api.keybd_event(CONTROL["Down"], 0, 0, 0)
-        time.sleep(.1)
-        win32api.keybd_event(CONTROL["Down"], 0, win32con.KEYEVENTF_KEYUP, 0)
-        print("Down")
+    if input == 3:
+            win32api.keybd_event(CONTROL["Down"], 0, 0, 0)
+            time.sleep(.1)
+            win32api.keybd_event(CONTROL["Down"], 0, win32con.KEYEVENTF_KEYUP, 0)
+            print("Down")
         # time.sleep(.005)
+
+    if input == 4:
+            win32api.keybd_event(CONTROL["Up"], 0, 0, 0)
+            win32api.keybd_event(CONTROL["Left"], 0, 0, 0)
+            time.sleep(.1)
+            win32api.keybd_event(CONTROL["Up"], 0, win32con.KEYEVENTF_KEYUP, 0)
+            win32api.keybd_event(CONTROL["Left"], 0, win32con.KEYEVENTF_KEYUP, 0)
+            print("Up+Left")
+
+    if input == 5:
+            win32api.keybd_event(CONTROL["Up"], 0, 0, 0)
+            win32api.keybd_event(CONTROL["Right"], 0, 0, 0)
+            time.sleep(.1)
+            win32api.keybd_event(CONTROL["Up"], 0, win32con.KEYEVENTF_KEYUP, 0)
+            win32api.keybd_event(CONTROL["Right"], 0, win32con.KEYEVENTF_KEYUP, 0)
+            print("Up+Right")
+
+    if input == 6:
+            win32api.keybd_event(CONTROL["Down"], 0, 0, 0)
+            win32api.keybd_event(CONTROL["Left"], 0, 0, 0)
+            time.sleep(.1)
+            win32api.keybd_event(CONTROL["Down"], 0, win32con.KEYEVENTF_KEYUP, 0)
+            win32api.keybd_event(CONTROL["Left"], 0, win32con.KEYEVENTF_KEYUP, 0)
+            print("Down+Left")
+
+    if input == 7:
+            win32api.keybd_event(CONTROL["Down"], 0, 0, 0)
+            win32api.keybd_event(CONTROL["Right"], 0, 0, 0)
+            time.sleep(.1)
+            win32api.keybd_event(CONTROL["Down"], 0, win32con.KEYEVENTF_KEYUP, 0)
+            win32api.keybd_event(CONTROL["Right"], 0, win32con.KEYEVENTF_KEYUP, 0)
+            print("Down+Right")
+
+        #arrow key end
+
 
     if input == 100:
         win32api.keybd_event(CONTROL["Enter"], 0, 0, 0)
@@ -78,10 +110,20 @@ def action(input):
 
 def find_score(hwnd):
     hwnd = win32gui.FindWindowEx(hwnd, 0, "static", None)
-    score_text = win32gui.GetWindowText(hwnd) #Text를 뽑아낸다
-    start = score_text.index('(') # slicing start
-    end = score_text.index(')') # Slicing end
+    time.sleep(.05)
+
+    try:
+        score_text = win32gui.GetWindowText(hwnd) #Text를 뽑아낸다
+        start = score_text.index('(') # slicing start
+        end = score_text.index(')') # Slicing end
+    except ValueError:
+        time.sleep(1)
+        score_text = win32gui.GetWindowText(hwnd) #Text를 뽑아낸다
+        start = score_text.index('(') # slicing start
+        end = score_text.index(')') # Slicing end
+        pass
     score_text = score_text[start+2:end-2] #Score부분만 Slicing
+
     return float(score_text) # float 값으로 리턴한다
 #def end
 
@@ -99,37 +141,7 @@ def is_Activating():
 #def end
 
 def reset_env(): # 환경 초기화
-    if is_Actvating(): # 창이 활성화 중일 떄
-        Result_screen = win32gui.FindWindow(None, '닷지')
-
-        if Result_screen: # 결과 화면이 있으면
-
-            gamedone() # N을 눌러 창을 닫는다
-            time.sleep(.05)
-
-            action(100) #skip Game over
-            time.sleep(.05)
-
-            action(100) #restart
-        #if end
-
-        if Result_screen == False: # 결과 화면이 없으면
-
-            action(100) #start or skip Game over
-            time.sleep(.05)
-
-            action(100) #restart or 그냥 눌러봄
-        #if end
-
-    #done = False
-    #return done
-
-def Game_env(action_input):
-    if is_Activating:
-        #init part
-        reward = 0
-        done = False
-        _ = None
+    if is_Activating(): # 창이 활성화 중일 떄
         gameWindow = init()
 
         #capture screen
@@ -143,36 +155,87 @@ def Game_env(action_input):
         bw[bw >= 200] = 255
         img = np.array(bw)
 
+        Result_screen = win32gui.FindWindow(None, '닷지')
+
+        if Result_screen: # 결과 화면이 있으면
+            gamedone() # N을 눌러 창을 닫는다
+            time.sleep(.05)
+        #if end
+
+        action(100) #start or skip Game over
+        time.sleep(.05)
+        action(100) #restart or 그냥 눌러봄
+        observation = img  # return observation data
+        #if end
+
+    if is_Activating() == False: # is not activated
+        while():
+            time.sleep(1)
+            print("Not Activate window")
+        #while end
+    #else end
+
+    return observation
+
+def Game_env(action_input):
+    if is_Activating:
+        #print("<<game_env_start>>")
+        #init part
+        reward = 0
+        done = False
+        _ = None
+        gameWindow = init()
+        #print("<<capture_screen>>")
+        #capture screen
+        sct = mss()
+        sct.get_pixels(gameWindow)
+
+        #bw = Image.frombytes('L', (sct.width, sct.height), sct.image)
+
+        img = Image.frombytes('L', (sct.width, sct.height), sct.image)
+
+        #dataset downsample to Black & white
+        bw = np.asarray(img).copy()
+        bw[bw < 200] = 0
+        bw[bw >= 200] = 255
+
+        img = np.array(bw)
+
         observation = img #return observation data
 
         Result_screen = win32gui.FindWindow(None, '닷지')
 
     if Result_screen == False: #if is not done
+        #print("<<Action>>")
         action(action_input)
         #print(img)
         #print(img.shape)
         #print(np.reshape(img, (1, -1)).shape)
+        reward = 1
+
 
     if Result_screen:
         #스크린 떴을때
         #print("Game Over!")
-        reward = find_score(Result_screen) #메세지 창에서 점수 추출
+        #reward = find_score(Result_screen) #메세지 창에서 점수 추출
         done = True
 
 
     return observation, reward, done, _
 
+
+'''
 done = False
 time.sleep(5)
 
+
 while 1:
         time.sleep(2)
-        #done = reset_env()
         reset_env()
         step = 0
 
         while done == False:
-            control_rand = np.random.random_integers(0, 3, None)
+            control_rand = np.random.random_integers(0, 7, None)
             obs, reward, done, _ = Game_env(control_rand)
             step += 1
             print("-----------------------------------")
@@ -182,3 +245,4 @@ while 1:
             print("Reward : {}".format(reward))
             print("done : {}".format(done))
             print("-----------------------------------")
+'''

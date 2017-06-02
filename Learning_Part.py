@@ -1,43 +1,29 @@
 # -*- coding: utf-8 -*-
-'''
-import gym
-env = gym.make('')
-for i_episode in range(20):
-    observation = env.reset()
-    for t in range(100):
-        env.render()
-        #print(observation)
-        action = env.action_space.sample()
-        observation, reward, done, info = env.step(action)
-        #print("Obs is : {}".format(observation))
-        #print("Act is : {}".format(action))
-        print("Act1 is : {}".format()
-        print("rwd is : {}".format(reward))
-        if done:
-            print("Episode finished after {} timesteps".format(t+1))
-            break
-'''
-import gym
+
+#import gym
 import tensorflow as tf
 import random
 import numpy as np
 from argparse import ArgumentParser
 import matplotlib.pyplot as plt
+import IO_Part as game
+import time
+import subprocess
 
 OUT_DIR = './experiment' # 녹화한 영상 저장 경로
-MAX_SCORE_QUEUE_SIZE = 100 # 마지막 몇개 스코어를 평균을 내서 평균 스코어로 활용할건지
-GAME = 'Pong-v0' # 게임 환경
+MAX_SCORE_QUEUE_SIZE = 50 # 마지막 몇개 스코어를 평균을 내서 평균 스코어로 활용할건지
+#GAME = 'Pong-v0' # 게임 환경
 
 
 def get_options():
     parser = ArgumentParser()
-    parser.add_argument('--MAX_EPISODE', type=int, default=3000,
+    parser.add_argument('--MAX_EPISODE', type=int, default=8000,
                         help='최대 에피소드를 몇번 반복할건지')
 
-    parser.add_argument('--ACTION_DIM', type=int, default=4,
+    parser.add_argument('--ACTION_DIM', type=int, default=8,
                         help='한번에 몇번 액션을 취할건지')
 
-    parser.add_argument('--OBSERVATION_DIM', type=int, default=100800,
+    parser.add_argument('--OBSERVATION_DIM', type=int, default=123424,
                         help='한번에 볼 수 있는 상태의 수')
 
     parser.add_argument('--GAMMA', type=float, default=0.9,
@@ -58,19 +44,19 @@ def get_options():
     parser.add_argument('--LR', type=float, default=1e-4,
                         help='학습 비율')
 
-    parser.add_argument('--MAX_EXPERIENCE', type=int, default=2000,
+    parser.add_argument('--MAX_EXPERIENCE', type=int, default=1000,
                         help='경험 재생 메모리의 크기')
 
     parser.add_argument('--BATCH_SIZE', type=int, default=256,
                         help='미니 배치의 크기')
 
-    parser.add_argument('--H1_SIZE', type=int, default=128,
+    parser.add_argument('--H1_SIZE', type=int, default=256,
                         help='히든 레이어 1의 크기')
 
-    parser.add_argument('--H2_SIZE', type=int, default=128,
+    parser.add_argument('--H2_SIZE', type=int, default=256,
                         help='히든 레이어 2의 크기')
 
-    parser.add_argument('--H3_SIZE', type=int, default=128,
+    parser.add_argument('--H3_SIZE', type=int, default=256,
                         help='히든 레이어 3의 크기')
 
     options = parser.parse_args()
@@ -329,8 +315,9 @@ def train(env):
     # 에피소드 루프 정의
     for i_episode in range(options.MAX_EPISODE): #MAX_EPISODE는 3000번의 정의 되어있음. 3000번 까지 play
 
-        observation = env.reset() #OpenAi Gym. observation을 reset해주고
-        obs2 = np.reshape(observation, (1, -1))
+        #observation = env.reset() #OpenAi Gym. observation을 reset해주고
+        observation = game.reset_env()
+        obs_to_1dim = np.reshape(observation, (1, -1)) #차원을 낮춘다
         done = False # episode가 끝나기 전까진 done = false
         score = 0
         sum_loss_value = 0
@@ -343,15 +330,14 @@ def train(env):
             if global_step % options.EPS_ANNEAL_STEPS == 0 and eps > options.FINAL_EPS:
                 #global step이 EPS_ANNEAL_STEPS를 지날때마다 그리고 엡실론이 최종 엡실론 보다 크면
                 eps = eps * options.EPS_DECAY # 엡실론에 감쇠 비율을 적용한다
+            #if end
 
-            env.render() # OpenAIGYM. 현재 상황을 렌더링해줌
+            #env.render() # OpenAIGYM. 현재 상황을 렌더링해줌
 
-
-
-            obs_queue[exp_pointer] = obs2 # Observation 값을 obs_queue에 저장 exp_pointer는 큐의 순서를 지칭함
+            obs_queue[exp_pointer] = obs_to_1dim # Observation 값을 obs_queue에 저장 exp_pointer는 큐의 순서를 지칭함
             #오래된 observation 부터 없앤다
 
-            action = agent.sample_action(Q1, {obs: np.reshape(observation, (1, -1))}, eps, options) # <- 물어볼 것 reshape 부분
+            action = agent.sample_action(Q1, {obs: obs_to_1dim}, eps, options) # <- 물어볼 것 reshape 부분
             '''
             action은 agent 클래스 QAgent(options) 에서 sample_action 함수를 통해서 결정
             Epsilon greedy하게 현재 observation이 DQN을 통과하여 나온 Q값을 바탕으로 action을 결정함)
@@ -361,46 +347,45 @@ def train(env):
 
             add_value_net는 Q Agent 초기화 부분에서 W1,B1... 등 클래스 그 자신을 가져와서 수행
             Feed는 obs에
-
             '''
 
             act_queue[exp_pointer] = action
             #action을 큐의 순서에 맞게 act_queue로 저장
 
-            observation, reward, done, _ = env.step(np.argmax(action))
+            #observation, reward, done, _ = env.step(np.argmax(action))
+
+            observation, reward, done, _ = game.Game_env(np.argmax(action))
             #OpenAI Gym. _는 info 부분. argmax는 최대 구성요소의 인덱스를 반환합니다
+            obs_to_1dim = np.reshape(observation, (1, -1))
 
             score += reward
-            reward = score  # Reward will be the accumulative score
+            # Reward will be the accumulative score
             #episode가 끝나지 않고 step이 증가하면 reward를 +1하고 그걸 score로 저장. score는 replay memory로 들어감
 
 
-            if done and score < 200: #done이 올라오고 score가 200 이하이면
-                reward = -500  # If it fails, punish hard
-                observation = np.zeros_like(observation) # 이럴 경우 observation을 0으로 초기화
-            '''
-            if done and score >= 1:
-                reward = +500
 
-            if done and score == 0:
-                reward = -200
-            '''
+
+            if done and score < 30: #done이 올라오고 score가 200 이하이면
+                reward = -500  # If it fails, punish hard
+                observation = np.zeros_like(obs_to_1dim) # 이럴 경우 observation을 0으로 초기화
+            #if end
+
             #step을 진행해도 끝나지 않으면
             rwd_queue[exp_pointer] = reward # reward queue에 reward 값을 넣고
-            next_obs_queue[exp_pointer] = obs2 #Observation을 저장하고
+            next_obs_queue[exp_pointer] = obs_to_1dim #Observation을 저장하고
 
             exp_pointer += 1 #queue의 index pointer를 1 증가시킨다
 
             if exp_pointer == options.MAX_EXPERIENCE: # index point가 max_exprience에 도달하면
                 exp_pointer = 0  # Refill the replay memory if it is full
+            #if end
 
             #exprience는 초기화되고 새로운 exprience를 생성
-
             if global_step >= options.MAX_EXPERIENCE: # Global step이 max_exprience의 수를 넘으면
 
                 '''
                 max_exprience가 2000개가 안넘으면 학습하지 않고 랜덤하게 경험만 쌓임.
-                2000번 이상 쌓이면 그 때 부터 mini batch를 뽑아 그것을 feed로 주어 DQN을 학습한다
+                n번 이상 쌓이면 그 때 부터 mini batch를 뽑아 그것을 feed로 주어 DQN을 학습한다
                 '''
 
                 rand_indexs = np.random.choice(options.MAX_EXPERIENCE, options.BATCH_SIZE)
@@ -414,47 +399,45 @@ def train(env):
 
                 if not learning_finished:  # If not solved, we train and get the step loss
                     step_loss_value, _ = sess.run([loss, train_step], feed_dict=feed)
+                #if not end
 
                 else:  # If solved, we just get the step loss
                     step_loss_value = sess.run(loss, feed_dict=feed)
+                #else end
 
                 # Use sum to calculate average loss of this episode
                 sum_loss_value += step_loss_value
                 # feed를 먹이고 loss함수를 가지고 train_step을 진행. 그 값을 step_loss_value로 저장한다
-
+            #if end
         #step loop 종료
-        print("====== Episode {} ended with score = {}, avg_loss = {} ======")
-            .format(i_episode+1, score, sum_loss_value / score)
 
-        VAL_SUM += score
-        graph = plt.scatter(i_episode+1 ,score)
+        print("====== {} ======".format(time.ctime()))
+        print("====== Episode {} ended with score = {}, avg_loss = {} ======".format(i_episode+1, score, sum_loss_value / score))
 
-        #plt.clf()
-        #plt.show()
 
         score_queue.append(score) # score queue에 score를 넣고
 
         if len(score_queue) > MAX_SCORE_QUEUE_SIZE: #score_queue 사이즈가 max score queue size 보다 크면
             score_queue.pop(0) #queue를 0으로 팝업한다
 
-            if np.mean(score_queue) > 195: #score_queue가 195를 넘었다면
+            if np.mean(score_queue) > 100: #score_queue가 195를 넘었다면
                 learning_finished = True # 풀린것으로 판정
             else:
                 learning_finished = False # 아니라면 계속 지속한다
 
         if learning_finished: #풀렸다면
-            print "Testing !!!" # 테스팅 이라고 출력한다
+            print("Complete !!!") # Complete 이라고 출력한다
 
         # save progress every 100 episodes
         if learning_finished == 0 and i_episode % 100 == 0: #학습이 끝나지 않았고 에피소드 100번이 지나갈때마다
             saver.save(sess, './checkpoints/'+ 'dqn', global_step = global_step) # ./checkpoints/ 폴더에 저장
             print("save!") #save!라고 말함
-    return graph
 
 
 
 if __name__ == "__main__":
 
-    env = gym.make(GAME)
-    res = train(env)
+    #env = gym.make(GAME)
+    train(game)
+    subprocess.call(["shutdown","/s"])
 
