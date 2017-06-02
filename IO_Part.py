@@ -211,7 +211,7 @@ def Game_env(action_input):
         #print(img)
         #print(img.shape)
         #print(np.reshape(img, (1, -1)).shape)
-        reward = 1
+        reward = 0.5
 
 
     if Result_screen:

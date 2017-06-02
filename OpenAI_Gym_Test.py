@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-
+'''
 import gym
 import numpy as np
 
@@ -27,3 +27,14 @@ for i_episode in range(20):
         if done:
             print("Episode finished after {} timesteps".format(t+1))
             break
+'''
+
+MAX = 256
+for i in range(MAX):
+        if i == 100 / 4:
+            print("학습 25% 완료...")
+        if i == 100 / 2:
+            print("학습 50% 완료...")
+        if i == 100 * 3 / 4:
+            print("학습 75% 완료...")
+        print(i)

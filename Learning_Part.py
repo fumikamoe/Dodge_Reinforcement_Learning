@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-#import gym
+
 import tensorflow as tf
 import random
 import numpy as np
@@ -8,16 +8,15 @@ from argparse import ArgumentParser
 import matplotlib.pyplot as plt
 import IO_Part as game
 import time
-import subprocess
 
-OUT_DIR = './experiment' # 녹화한 영상 저장 경로
+
 MAX_SCORE_QUEUE_SIZE = 50 # 마지막 몇개 스코어를 평균을 내서 평균 스코어로 활용할건지
-#GAME = 'Pong-v0' # 게임 환경
+
 
 
 def get_options():
     parser = ArgumentParser()
-    parser.add_argument('--MAX_EPISODE', type=int, default=8000,
+    parser.add_argument('--MAX_EPISODE', type=int, default=1000,
                         help='최대 에피소드를 몇번 반복할건지')
 
     parser.add_argument('--ACTION_DIM', type=int, default=8,
@@ -35,7 +34,7 @@ def get_options():
     parser.add_argument('--FINAL_EPS', type=float, default=1e-5,
                         help='무작위 표본 추출 작업에 대한 최종 확률')
 
-    parser.add_argument('--EPS_DECAY', type=float, default=0.95,
+    parser.add_argument('--EPS_DECAY', type=float, default=0.98,
                         help='엡실론 감쇠율')
 
     parser.add_argument('--EPS_ANNEAL_STEPS', type=int, default=10,
@@ -292,8 +291,14 @@ def train(env):
     rwd_queue = np.empty([options.MAX_EXPERIENCE])
     next_obs_queue = np.empty([options.MAX_EXPERIENCE, options.OBSERVATION_DIM])
 
+    temp_obs_queue = np.empty([options.MAX_EXPERIENCE, options.OBSERVATION_DIM])  # 행이 MAX_EXPERIENCE이고 열이 OBSERVATION_DIM인 빈 행렬을 생성
+    temp_act_queue = np.empty([options.MAX_EXPERIENCE, options.ACTION_DIM])
+    temp_rwd_queue = np.empty([options.MAX_EXPERIENCE])
+    temp_next_obs_queue = np.empty([options.MAX_EXPERIENCE, options.OBSERVATION_DIM])
+
     # Score cache
     score_queue = []
+    squence = []
 
     # 에피소드 루프 정의
     for i_episode in range(options.MAX_EPISODE): #MAX_EPISODE는 3000번의 정의 되어있음. 3000번 까지 play
@@ -303,6 +308,7 @@ def train(env):
         done = False # episode가 끝나기 전까진 done = false
         score = 0
         sum_loss_value = 0
+        temp_pointer = 0
 
         #Exp Loop
         while not done: #에피소드가 끝나지 않았다면
@@ -311,11 +317,7 @@ def train(env):
                 #global step이 EPS_ANNEAL_STEPS를 지날때마다 그리고 엡실론이 최종 엡실론 보다 크면
                 eps = eps * options.EPS_DECAY # 엡실론에 감쇠 비율을 적용한다
             #if end
-
-            if exp_pointer != options.MAX_EXPERIENCE:
-                obs_queue[exp_pointer] = obs_to_1dim # Observation 값을 obs_queue에 저장 exp_pointer는 큐의 순서를 지칭함
-            #if end
-
+            temp_obs_queue[temp_pointer] = obs_to_1dim # Observation 값을 obs_queue에 저장 exp_pointer는 큐의 순서를 지칭함
             action = agent.sample_action(Q1, {obs: obs_to_1dim}, eps, options) #Action 추출
             '''
             action은 agent 클래스 QAgent(options) 에서 sample_action 함수를 통해서 결정
@@ -335,23 +337,39 @@ def train(env):
             score += reward
             # Reward will be the accumulative score
             #episode가 끝나지 않고 step이 증가하면 reward를 +1하고 그걸 score로 저장. score는 replay memory로 들어감
-            if done and score < 20: #done이 올라오고 score가 200 이하이면
-                reward = -500  # If it fails, punish hard
-                obs_to_1dim = np.zeros_like(obs_to_1dim) # 이럴 경우 observation을 0으로 초기화
-            #if end
 
             #step을 진행해도 끝나지 않으면
-            if exp_pointer != options.MAX_EXPERIENCE:
-                act_queue[exp_pointer] = action
-                rwd_queue[exp_pointer] = reward # reward queue에 reward 값을 넣고
-                next_obs_queue[exp_pointer] = obs_to_1dim #Observation을 저장하고
-                exp_pointer += 1 #queue의 index pointer를 1 증가시킨다
-                print(exp_pointer)
+            temp_act_queue[temp_pointer] = action
+            temp_rwd_queue[temp_pointer] = reward # reward queue에 reward 값을 넣고
+            temp_next_obs_queue[temp_pointer] = obs_to_1dim #Observation을 저장하고
+            temp_pointer += 1 #queue의 index pointer를 1 증가시킨다
             #if end
         #step loop 종료
+        #queuing score
+        for i in range(temp_pointer):
+            if exp_pointer != options.MAX_EXPERIENCE:
+                if score >= 5:
+                    obs_queue[exp_pointer] = temp_obs_queue[i]
+                    act_queue[exp_pointer] =  temp_act_queue[i]
+                    next_obs_queue[exp_pointer] =  temp_next_obs_queue[i]
+                    rwd_queue[exp_pointer] = temp_rwd_queue[i]
+                #if end
+                elif score < 5:
+                    obs_queue[exp_pointer] = temp_obs_queue[i]
+                    act_queue[exp_pointer] = temp_act_queue[i]
+                    next_obs_queue[exp_pointer] = temp_next_obs_queue[i]
+                    rwd_queue[exp_pointer] = -500
+                #else end
+                exp_pointer += 1
+            #exp_point if end
+            else:
+                break
+        #for end
+
         #Print Result
         print("====== {} ======".format(time.ctime()))
-        print("====== Episode {} ended with score = {}, avg_loss = {} ======".format(i_episode+1, score, sum_loss_value / score))
+        print("====== Episode {} ended with score = {}, avg_loss = {}, Exp size = {} ======".format(i_episode+1, score, sum_loss_value / score, exp_pointer))
+
 
         #Learn Part
         if exp_pointer == options.MAX_EXPERIENCE:
@@ -371,11 +389,11 @@ def train(env):
                     # Use sum to calculate average loss of this episode
                     sum_loss_value += step_loss_value
                     # feed를 먹이고 loss함수를 가지고 train_step을 진행. 그 값을 step_loss_value로 저장한다
-                    if i == i / 4:
+                    if i == options.BATCH_SIZE / 4:
                         print("학습 25% 완료...")
-                    if i == i / 2:
+                    if i == options.BATCH_SIZE / 2:
                         print("학습 50% 완료...")
-                    if i == i * 3/4:
+                    if i == options.BATCH_SIZE * 3/4:
                         print("학습 75% 완료...")
                 #for end
                 exp_pointer = 0 #학습 포인터 초기화
@@ -384,8 +402,18 @@ def train(env):
                 saver.save(sess, './checkpoints/' + 'dqn', global_step=global_step)  # ./checkpoints/ 폴더에 저장
                 print("저장했습니다!!")  # save!라고 말함
         #Learn Part end
-
+        score_queue.append(score)
+        squence.append(i_episode+1)
     #episode end
+
+    #graph show
+    plt.autoscale(enable=True, axis=u'both', tight=False)
+    plt.xlabel("EPISODE")
+    plt.ylabel("SCORE")
+    plt.xticks(np.arange(0, max(squence)+1 , 1.0))
+    plt.plot(squence, score_queue)
+    plt.scatter(squence,score_queue)
+    plt.show()
 
 #train end
 
@@ -394,16 +422,3 @@ def train(env):
 
 if __name__ == "__main__":
     train(game)
-    subprocess.call(["shutdown","/s"])
-
-'''
-score_queue.append(score) # score queue에 score를 넣고
-if len(score_queue) > MAX_SCORE_QUEUE_SIZE: #score_queue 사이즈가 max score queue size 보다 크면
-   score_queue.pop(0) #queue를 0으로 팝업한다
-   if np.mean(score_queue) > 100: #score_queue가 195를 넘었다면
-       learning_finished = True # 풀린것으로 판정
-   else:
-       learning_finished = False # 아니라면 계속 지속한다
-if learning_finished: #풀렸다면
-   print("Complete !!!") # Complete 이라고 출력한다
-'''
