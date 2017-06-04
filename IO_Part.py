@@ -42,28 +42,28 @@ def action(input):
         win32api.keybd_event(CONTROL["Left"], 0, 0, 0)
         time.sleep(.1)
         win32api.keybd_event(CONTROL["Left"], 0, win32con.KEYEVENTF_KEYUP, 0)
-        print("Left")
+        #print("Left")
         #time.sleep(0.05)
 
     if input == 1:
         win32api.keybd_event(CONTROL["Right"], 0, 0, 0)
         time.sleep(.1)
         win32api.keybd_event(CONTROL["Right"], 0, win32con.KEYEVENTF_KEYUP, 0)
-        print("Right")
+        #print("Right")
         # time.sleep(0.05)
 
     if  input == 2:
         win32api.keybd_event(CONTROL["Up"], 0, 0, 0)
         time.sleep(.1)
         win32api.keybd_event(CONTROL["Up"], 0, win32con.KEYEVENTF_KEYUP, 0)
-        print("Up")
+        #print("Up")
         #time.sleep(.005)
 
     if input == 3:
             win32api.keybd_event(CONTROL["Down"], 0, 0, 0)
             time.sleep(.1)
             win32api.keybd_event(CONTROL["Down"], 0, win32con.KEYEVENTF_KEYUP, 0)
-            print("Down")
+            #print("Down")
         # time.sleep(.005)
 
     if input == 4:
@@ -72,7 +72,7 @@ def action(input):
             time.sleep(.1)
             win32api.keybd_event(CONTROL["Up"], 0, win32con.KEYEVENTF_KEYUP, 0)
             win32api.keybd_event(CONTROL["Left"], 0, win32con.KEYEVENTF_KEYUP, 0)
-            print("Up+Left")
+            #print("Up+Left")
 
     if input == 5:
             win32api.keybd_event(CONTROL["Up"], 0, 0, 0)
@@ -80,7 +80,7 @@ def action(input):
             time.sleep(.1)
             win32api.keybd_event(CONTROL["Up"], 0, win32con.KEYEVENTF_KEYUP, 0)
             win32api.keybd_event(CONTROL["Right"], 0, win32con.KEYEVENTF_KEYUP, 0)
-            print("Up+Right")
+            #print("Up+Right")
 
     if input == 6:
             win32api.keybd_event(CONTROL["Down"], 0, 0, 0)
@@ -88,7 +88,7 @@ def action(input):
             time.sleep(.1)
             win32api.keybd_event(CONTROL["Down"], 0, win32con.KEYEVENTF_KEYUP, 0)
             win32api.keybd_event(CONTROL["Left"], 0, win32con.KEYEVENTF_KEYUP, 0)
-            print("Down+Left")
+            #print("Down+Left")
 
     if input == 7:
             win32api.keybd_event(CONTROL["Down"], 0, 0, 0)
@@ -96,7 +96,7 @@ def action(input):
             time.sleep(.1)
             win32api.keybd_event(CONTROL["Down"], 0, win32con.KEYEVENTF_KEYUP, 0)
             win32api.keybd_event(CONTROL["Right"], 0, win32con.KEYEVENTF_KEYUP, 0)
-            print("Down+Right")
+            #print("Down+Right")
 
         #arrow key end
 
@@ -116,13 +116,11 @@ def find_score(hwnd):
         score_text = win32gui.GetWindowText(hwnd) #Text를 뽑아낸다
         start = score_text.index('(') # slicing start
         end = score_text.index(')') # Slicing end
-    except ValueError:
-        time.sleep(1)
-        score_text = win32gui.GetWindowText(hwnd) #Text를 뽑아낸다
-        start = score_text.index('(') # slicing start
-        end = score_text.index(')') # Slicing end
+        score_text = score_text[start + 2:end - 2]  # Score부분만 Slicing
+    except:
+        score_text = 0
         pass
-    score_text = score_text[start+2:end-2] #Score부분만 Slicing
+
 
     return float(score_text) # float 값으로 리턴한다
 #def end
@@ -211,17 +209,18 @@ def Game_env(action_input):
         #print(img)
         #print(img.shape)
         #print(np.reshape(img, (1, -1)).shape)
-        reward = 0.5
+        reward = 1.0
+        living_time = 0
 
 
     if Result_screen:
         #스크린 떴을때
         #print("Game Over!")
-        #reward = find_score(Result_screen) #메세지 창에서 점수 추출
+        living_time = find_score(Result_screen) #메세지 창에서 점수 추출
         done = True
 
 
-    return observation, reward, done, _
+    return observation, reward, done, living_time
 
 
 '''

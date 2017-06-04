@@ -28,13 +28,24 @@ for i_episode in range(20):
             print("Episode finished after {} timesteps".format(t+1))
             break
 '''
+import pickle
+import matplotlib.pyplot as plt
+import numpy as np
 
-MAX = 256
-for i in range(MAX):
-        if i == 100 / 4:
-            print("학습 25% 완료...")
-        if i == 100 / 2:
-            print("학습 50% 완료...")
-        if i == 100 * 3 / 4:
-            print("학습 75% 완료...")
-        print(i)
+f = open('./progress_result.txt','rb')
+a = pickle.load(f)
+print(a)
+print(len(a))
+f.close()
+queue_size = []
+for i in range(len(a)):
+    queue_size.append(i)
+
+
+plt.autoscale(enable=True, axis=u'both', tight=False)
+plt.xlabel("EPISODE")
+plt.ylabel("SCORE")
+plt.xticks(np.arange(0, len(a) + 1, 500))
+plt.plot(queue_size, a)
+#plt.scatter(queue_size, a)
+plt.show()
