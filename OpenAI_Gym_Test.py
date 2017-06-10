@@ -39,18 +39,18 @@ print(a)
 print(len(a))
 f.close()
 queue_size = []
+queue2 = []
 for i in range(len(a)):
-#    if a[i] <= 5.0:
-#        a[i] = 0
     queue_size.append(i)
 
-print(a)
+#print(a)
+
 plt.autoscale(enable=True, axis=u'both', tight=False)
 plt.xlabel("EPISODE")
 plt.ylabel("SCORE")
-plt.xticks(np.arange(0, len(a) + 1, 1))
-#plt.plot(queue_size, a)
-plt.scatter(queue_size, a)
+plt.xticks(np.arange(0, len(a) + 1, 10))
+plt.plot(queue_size, a)
+#plt.scatter(queue_size, a)
 plt.show()
 
 def init():
@@ -59,7 +59,7 @@ def init():
     pickle.dump(a, f)
     f.close()
     print("==이태까지의 진행 과정을 저장했습니다!==")
-
+init()
 '''
 import win32gui
 import win32api

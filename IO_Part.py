@@ -19,7 +19,9 @@ CONTROL = {'Left':0x25,
            'Enter':0x0D,
             'N':0x4E
 }
+
 axis = [0,0]
+
 def init():
     window_name = win32gui.FindWindow(None, TARGET_NAME)
     left, top, right, bot, = win32gui.GetWindowRect(window_name)
@@ -45,7 +47,6 @@ def action(input,axis):
         win32api.keybd_event(CONTROL["Left"], 0, win32con.KEYEVENTF_KEYUP, 0)
         #print("Left")
         axis[0] -= 1
-        #time.sleep(0.05)
 
     if input == 1:
         win32api.keybd_event(CONTROL["Right"], 0, 0, 0)
@@ -53,7 +54,6 @@ def action(input,axis):
         win32api.keybd_event(CONTROL["Right"], 0, win32con.KEYEVENTF_KEYUP, 0)
         #print("Right")
         axis[0] += 1
-        # time.sleep(0.05)
 
     if  input == 2:
         win32api.keybd_event(CONTROL["Up"], 0, 0, 0)
@@ -61,7 +61,6 @@ def action(input,axis):
         win32api.keybd_event(CONTROL["Up"], 0, win32con.KEYEVENTF_KEYUP, 0)
         #print("Up")
         axis[1] += 1
-        #time.sleep(.005)
 
     if input == 3:
         win32api.keybd_event(CONTROL["Down"], 0, 0, 0)
@@ -69,7 +68,6 @@ def action(input,axis):
         win32api.keybd_event(CONTROL["Down"], 0, win32con.KEYEVENTF_KEYUP, 0)
         #print("Down")
         axis[1] -= 1
-        # time.sleep(.005)
 
     if input == 4:
             win32api.keybd_event(CONTROL["Up"], 0, 0, 0)
@@ -118,13 +116,11 @@ def action(input,axis):
         win32api.keybd_event(CONTROL["Enter"], 0, 0, 0)
         time.sleep(.05)
         win32api.keybd_event(CONTROL["Enter"], 0, win32con.KEYEVENTF_KEYUP, 0)
-
 #def end
 
 def find_score(hwnd):
     hwnd = win32gui.FindWindowEx(hwnd, 0, "static", None)
     time.sleep(.05)
-
     try:
         score_text = win32gui.GetWindowText(hwnd) #Text를 뽑아낸다
         start = score_text.index('(') # slicing start
@@ -133,8 +129,6 @@ def find_score(hwnd):
     except:
         score_text = 0
         pass
-
-
     return float(score_text) # float 값으로 리턴한다
 #def end
 
@@ -147,7 +141,6 @@ def is_Activating():
     else :
         active_status = False
         print("Game is not Activated!!!!")
-
     return active_status
 #def end
 
@@ -178,7 +171,7 @@ def reset_env(): # 환경 초기화
         bw[bw >= 200] = 255
 
         obs1 = bw  # return observation data
-
+        '''
         sct = mss()
         sct.get_pixels(gameWindow)
         img_init = Image.frombytes('RGB', (sct.width, sct.height), sct.image)
@@ -189,19 +182,15 @@ def reset_env(): # 환경 초기화
         bw = np.asarray(img_np).copy()
         bw[bw < 200] = 0
         bw[bw >= 200] = 255
-
+        '''
         obs2 = bw
-
     #if end
     if is_Activating() == False: # is not activated
-        while():
-            time.sleep(1)
-            print("Not Activate window")
+        time.sleep(1)
+        print("Not Activate window")
         #while end
     #lsee end
     return obs1,obs2
-
-
 
 def Game_env(action_input,axis):
     if is_Activating:
@@ -227,14 +216,21 @@ def Game_env(action_input,axis):
 
     if Result_screen == False: #if is not done
         action(action_input,axis)
-        reward = 1.0
-        living_time = 0
+        if axis[0] <= -16 or axis[0] >= 16 or axis[1] <= -12 or axis[1] >= 12:
+            reward = -1.0
+            living_time = 0
+            done = True
+            print("Warning!")
+            time.sleep(5)
+        else:
+            reward = 1.0
+            living_time = 0
+
     if Result_screen:
         #스크린 떴을때
         living_time = find_score(Result_screen) #메세지 창에서 점수 추출
         done = True
-
-    sct = mss()
+    '''
     sct.get_pixels(gameWindow)
     img_init = Image.frombytes('RGB', (sct.width, sct.height), sct.image)
     img_np = np.array(img_init)
@@ -244,9 +240,8 @@ def Game_env(action_input,axis):
     bw = np.asarray(img_np).copy()
     bw[bw < 200] = 0
     bw[bw >= 200] = 255
-
+    '''
     obs2 = bw
-
     return obs1, obs2, reward, done, living_time, axis
 
 
@@ -259,8 +254,6 @@ while 1:
         obs1,obs2 = reset_env()
         step = 0
         while not done:
-            cv2.imshow('obs1', obs1)
-            cv2.imshow('obs2', obs2)
             control_rand = np.random.random_integers(0, 7, None)
             obs1, obs2, reward, done, _, _  = Game_env(control_rand,axis)
             step += 1
@@ -271,9 +264,5 @@ while 1:
             print("Reward : {}".format(reward))
             print("done : {}".format(done))
             print(np.reshape(obs1, (1, -1)).shape)
-
-            if cv2.waitKey(25) & 0xFF == ord('q'):
-                cv2.destroyAllWindows()
-
             print("-----------------------------------")
 '''
