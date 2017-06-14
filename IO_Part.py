@@ -244,14 +244,14 @@ def Game_env(action_input,axis):
     obs2 = bw
     return obs1, obs2, reward, done, living_time, axis
 
-
 '''
+
 time.sleep(2)
 
 while 1:
         done = False
         time.sleep(2)
-        obs1,obs2 = reset_env()
+        obs1, obs2 = reset_env()
         step = 0
         while not done:
             control_rand = np.random.random_integers(0, 7, None)
@@ -263,6 +263,9 @@ while 1:
             print("Observation : {}".format(obs1))
             print("Reward : {}".format(reward))
             print("done : {}".format(done))
-            print(np.reshape(obs1, (1, -1)).shape)
+            #print(np.reshape(obs1, (1, -1)).shape)
+            print(obs1.shape)
+            print(np.size(obs1))
+            print("size is : {} x {}".format(np.size(obs1,1),np.size(obs1,0)))
             print("-----------------------------------")
 '''
