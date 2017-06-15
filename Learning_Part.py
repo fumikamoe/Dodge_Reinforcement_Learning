@@ -34,13 +34,13 @@ def get_options():
     parser.add_argument('--EPS_DECAY', type=float, default=0.95,
                         help='엡실론 감쇠율')
 
-    parser.add_argument('--EPS_ANNEAL_STEPS', type=int, default=2,
+    parser.add_argument('--EPS_ANNEAL_STEPS', type=int, default=10,
                         help='엡실론 감쇠를 위한 간격 단계')
 
     parser.add_argument('--LR', type=float, default=1e-4,
                         help='학습 비율')
 
-    parser.add_argument('--MAX_EXPERIENCE', type=int, default=2048,
+    parser.add_argument('--MAX_EXPERIENCE', type=int, default=1024,
                         help='경험 재생 메모리의 크기')
 
     parser.add_argument('--BATCH_SIZE', type=int, default=128,
@@ -177,7 +177,7 @@ class QAgent:
         return tf.nn.max_pool(x, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME')
 
     # Add options to graph
-    def add_value_net(self, x, options):
+    def add_value_net(self, options):
         '''
         x_image = tf.reshape(x,[-1,28,28,1])
         h_conv1 = tf.nn.relu(self.conv2d(x_image, self.W_conv1)+ self.B_conv1)
@@ -315,10 +315,10 @@ def train(env):
     options = get_options() # 위에서 정의한 get_options()를 통해 옵션을 정의함
     agent = QAgent(options) # QAgent class를 생성하여 agent라는 이름으로 넣음
     sess = tf.InteractiveSession() # Interactive Session을 생성
-    obs, Q1 = agent.add_value_net(0,options) # Observation을 넣으면 Q value가 나오는 함수 add_value_net 형태만 지정해줌
+    obs, Q1 = agent.add_value_net(options) # Observation을 넣으면 Q value가 나오는 함수 add_value_net 형태만 지정해줌
     act = tf.placeholder(tf.float32, [None, options.ACTION_DIM]) #float32 타입으로 ACTION_DIM 크기로 action 크기 결정
     rwd = tf.placeholder(tf.float32, [None, ]) # reward 크기 결정
-    next_obs, Q2 = agent.add_value_net(0,options) # Observation을 넣으면 Q value가 나오는 함수 add_value_net 형태만 지정해줌. Q1과 같은 형태
+    next_obs, Q2 = agent.add_value_net(options) # Observation을 넣으면 Q value가 나오는 함수 add_value_net 형태만 지정해줌. Q1과 같은 형태
     values1 = tf.reduce_sum(tf.multiply(Q1, act), reduction_indices=1)
     values2 = rwd + options.GAMMA * tf.reduce_max(Q2, reduction_indices=1)
     # reduction_indices=1 는 행끼리 처리하라는 reduce 연산의 옵션
@@ -386,7 +386,11 @@ def train(env):
 
     living_time_queue = []
     #i_episode = 0
-    i_episode = int(len(progress.open(0))) +1
+    open_data = int(len(progress.open(0)))
+    if open_data > 1:
+        i_episode = open_data * 50
+    else:
+        i_episode = open_data
     print("==이태까지의 진행 상황을 읽어옵니다!==")
     print("=={}==".format(i_episode))
 
@@ -395,25 +399,25 @@ def train(env):
         obs1, obs2 = game.reset_env()
         #observation = np.append(obs1,obs2)
         observation = obs1
-
-        obs_to_1dim = np.reshape(observation, (-1,)) #차원을 낮춘다
+        converted_observation = np.reshape(observation, (1, -1))
+        learn_obs = np.reshape(converted_observation, (-1,)) #차원을 낮춘다
         done = False # episode가 끝나기 전까진 done = false
         sum_loss_value = 0
         temp_pointer = 0
         living_time = 0
         axis=[0,0]
         boundray_contact = False
+        score = 0
 
         #Exp Loop
         while not done: #에피소드가 끝나지 않았다면
             global_step += 1 #global step을 1 더해주고
             #if i_episode % options.EPS_ANNEAL_STEPS == 0 and eps > options.FINAL_EPS:
-            if i_episode % 2 == 0 and eps > options.FINAL_EPS:
+            if global_step % options.EPS_ANNEAL_STEPS == 0 and eps > options.FINAL_EPS:
                 #에피소드가 EPS_ANNEAL_STEPS를 지날때마다 그리고 엡실론이 최종 엡실론 보다 크면
                 eps = eps * options.EPS_DECAY # 엡실론에 감쇠 비율을 적용한다
             #if end
-            #print("size is : {} x {}".format(np.size(obs1,1),np.size(obs1,0)))
-            temp_obs_queue[temp_pointer] = obs_to_1dim # Observation 값을 obs_queue에 저장 exp_pointer는 큐의 순서를 지칭함
+            temp_obs_queue[temp_pointer] = learn_obs # Observation 값을 obs_queue에 저장 exp_pointer는 큐의 순서를 지칭함
             '''
             action은 agent 클래스 QAgent(options) 에서 sample_action 함수를 통해서 결정
             Epsilon greedy하게 현재 observation이 DQN을 통과하여 나온 Q값을 바탕으로 action을 결정함)
@@ -427,10 +431,12 @@ def train(env):
             converted_observation = np.reshape(observation, (1,-1))
             action = agent.sample_action(Q1, {obs: converted_observation}, eps, options)  # Action 추출
             action = np.argmax(action)
+            #print("converted_observation :{}".format(converted_observation.shape))
+            #print("observation :{}".format(observation.shape))
+            #print("learn_observation :{}".format(learn_obs.shape))
 
             obs1, obs2, reward, done, living_time, axis = game.Game_env(action,axis)
             #OpenAI Gym. _는 info 부분. argmax는 최대 구성요소의 인덱스를 반환합니다
-
             #viewing observation
             if living_time == 0:
                 boundray_contact = True
@@ -441,27 +447,33 @@ def train(env):
 
             #cv2 end
 
-            #observation = np.append(obs1,obs2)
-            observation = obs1
-            obs_to_1dim = np.reshape(observation, (-1,))
+            #observation = np.append
 
-            if done: #done이 뜬 값
-                reward = -1
+
+
+            score += reward
+            reward = score
+            print("reward is : {}".format(reward))
+            # (obs1,obs2)
+            observation = obs1
+            learn_obs = np.reshape(observation, (-1,))
+
+            if done and living_time <= 10: #done이 뜬 값
+                reward = -200
+                learn_obs = np.zeros_like(learn_obs)
             #if done end
             temp_act_queue[temp_pointer] = action
-            temp_next_obs_queue[temp_pointer] = obs_to_1dim  # Observation을 저장하고
+            temp_next_obs_queue[temp_pointer] = learn_obs  # Onbservation을 저장하고
             temp_rwd_queue[temp_pointer] = reward  # reward queue에 reward 값을 넣고
             temp_pointer += 1  # queue의 index pointer를 1 증가시킨다
-
         #step loop 종료
 
 
         #스코어 누적 과정
         for i in range(temp_pointer):
                 if exp_pointer != options.MAX_EXPERIENCE:
-                    if living_time >=0.5:
+                    if living_time >= 0:
                         obs_queue[exp_pointer] = temp_obs_queue[i]
-
                         act_queue[exp_pointer] =  temp_act_queue[i]
                         next_obs_queue[exp_pointer] =  temp_next_obs_queue[i]
                         rwd_queue[exp_pointer] = temp_rwd_queue[i]
@@ -472,7 +484,7 @@ def train(env):
                         # for end
 
                 # Print Result
-        print("====== Survive time = {}, Exp size = {} ======".format(living_time, exp_pointer))
+        print("====== Episode = {}, Survive time = {}, Exp size = {} ======".format(i_episode, living_time, exp_pointer))
         living_time_queue.append(living_time)
         '''
         # Learn Part
@@ -517,9 +529,47 @@ def train(env):
             if i_episode % 20 == 0 and eps < options.FINAL_EPS:
                 eps = options.INIT_EPS # 저장하면 엡실론 초기화
             #저장부분 끝
-
         #Learn Part end
+        '''
+        if global_step >= options.MAX_EXPERIENCE:
+            rand_indexs = np.random.choice(options.MAX_EXPERIENCE, options.BATCH_SIZE)
+            # max_exprience에서 batch size만큼 랜덤으로 추출하여 rand indexs에 넣는다
+            feed.update({obs: obs_queue[rand_indexs]})
+            feed.update({act: act_queue[rand_indexs]})
+            feed.update({rwd: rwd_queue[rand_indexs]})
+            feed.update({next_obs: next_obs_queue[rand_indexs]})
+            # 랜덤한 indexs에 따라 각각 obs,act,rwd,next obs를 update
+            step_loss_value, _ = sess.run([loss, train_step], feed_dict=feed)
+            # Use sum to calculate average loss of this episode
+            sum_loss_value += step_loss_value
+            # feed를 먹이고 loss함수를 가지고 train_step을 진행. 그 값을 step_loss_value로 저장한다
 
+        if i_episode % 50 == 0 and global_step >= options.MAX_EXPERIENCE:
+            # 저장부분
+            saver.save(sess, './checkpoints/' + 'dqn', global_step=global_step)  # ./checkpoints/ 폴더에 저장
+            print("== 신경망을저장했습니다!!==")  # save!라고 말함
+
+            living_time = 0
+
+            for i in range(len(living_time_queue)):
+                living_time += living_time_queue[i]
+
+            living_time = living_time / len(living_time_queue)
+            print("====== {} ======".format(time.ctime()))
+            print("====== average survive time is {}======".format(living_time))
+            progress.save(living_time)
+            living_time_queue = []
+
+        #save end
+        if exp_pointer == options.MAX_EXPERIENCE:
+            exp_pointer = 0
+            print("====== {} ======".format(time.ctime()))
+            print("====== Exp pointer 초기화 ======")
+        if i_episode % 500 == 0:
+            eps = options.INIT_EPS
+            print("====== {} ======".format(time.ctime()))
+            print("====== 엡실론 초기화 ======")
+        i_episode += 1
     #episode end
 
 #train end

@@ -59,7 +59,7 @@ def init():
     pickle.dump(a, f)
     f.close()
     print("==이태까지의 진행 과정을 저장했습니다!==")
-init()
+#init()
 '''
 import win32gui
 import win32api

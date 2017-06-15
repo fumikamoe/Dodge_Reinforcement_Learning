@@ -11,6 +11,7 @@ import time
 
 
 TARGET_NAME = '닷지 1.9'
+RESULT_WINDOW = '닷지'
 
 CONTROL = {'Left':0x25,
            'Up':0x26,
@@ -136,7 +137,7 @@ def is_Activating():
     active_window = win32gui.GetForegroundWindow()
     active_window = win32gui.GetWindowText(active_window)
 
-    if active_window == TARGET_NAME or active_window == "닷지":
+    if active_window == TARGET_NAME or active_window == RESULT_WINDOW:
         active_status = True
     else :
         active_status = False
@@ -145,13 +146,18 @@ def is_Activating():
 #def end
 
 def reset_env(): # 환경 초기화
-    if is_Activating(): # 창이 활성화 중일 떄
-        Result_screen = win32gui.FindWindow(None, '닷지')
+    #if is_Activating(): # 창이 활성화 중일 떄
+        Result_screen = win32gui.FindWindow(None, RESULT_WINDOW)
 
-        if Result_screen: # 결과 화면이 있으면
-            gamedone() # N을 눌러 창을 닫는다
-            time.sleep(.05)
+        time.sleep(.5)
+        gamedone() # N을 눌러 창을 닫는다
+        time.sleep(.05)
         #if end
+
+        if Result_screen:
+            action(1,axis)
+            time.sleep(.05)
+            action(100,axis)
 
         action(100,axis) #start or skip Game over
         time.sleep(.05)
@@ -184,16 +190,11 @@ def reset_env(): # 환경 초기화
         bw[bw >= 200] = 255
         '''
         obs2 = bw
-    #if end
-    if is_Activating() == False: # is not activated
-        time.sleep(1)
-        print("Not Activate window")
-        #while end
-    #lsee end
-    return obs1,obs2
+        #if end
+        return obs1,obs2
 
 def Game_env(action_input,axis):
-    if is_Activating:
+    #if is_Activating:
         #init part
         reward = 0
         done = False
@@ -212,37 +213,32 @@ def Game_env(action_input,axis):
         bw[bw >= 200] = 255
         obs1 = bw
 
-        Result_screen = win32gui.FindWindow(None, '닷지')
+        Result_screen = win32gui.FindWindow(None, RESULT_WINDOW)
 
-    if Result_screen == False: #if is not done
-        action(action_input,axis)
-        if axis[0] <= -16 or axis[0] >= 16 or axis[1] <= -12 or axis[1] >= 12:
-            reward = -1.0
-            living_time = 0
-            done = True
-            print("Warning!")
-            time.sleep(5)
-        else:
+        if Result_screen == False: #if is not done
+            action(action_input,axis)
+            '''
+            if axis[0] <= -16 or axis[0] >= 16 or axis[1] <= -12 or axis[1] >= 12:
+                reward = -1.0
+                living_time = 0
+                done = True
+                print("Warning!")
+                time.sleep(5)
+            else:
+                reward = 1.0
+                living_time = 0
+            '''
             reward = 1.0
             living_time = 0
 
-    if Result_screen:
-        #스크린 떴을때
-        living_time = find_score(Result_screen) #메세지 창에서 점수 추출
-        done = True
-    '''
-    sct.get_pixels(gameWindow)
-    img_init = Image.frombytes('RGB', (sct.width, sct.height), sct.image)
-    img_np = np.array(img_init)
-    img_np = cv2.cvtColor(img_np, cv2.COLOR_RGB2GRAY)
+        if Result_screen:
+            #스크린 떴을때
+            time.sleep(0.05)
+            living_time = find_score(Result_screen) #메세지 창에서 점수 추출
+            done = True
 
-    # dataset downsample to Black & white
-    bw = np.asarray(img_np).copy()
-    bw[bw < 200] = 0
-    bw[bw >= 200] = 255
-    '''
-    obs2 = bw
-    return obs1, obs2, reward, done, living_time, axis
+        obs2 = bw
+        return obs1, obs2, reward, done, living_time, axis
 
 '''
 
