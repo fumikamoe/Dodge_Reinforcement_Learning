@@ -8,8 +8,6 @@ from mss import mss
 from PIL import Image
 import time
 
-
-
 TARGET_NAME = '닷지 1.9'
 RESULT_WINDOW = '닷지'
 
@@ -21,7 +19,8 @@ CONTROL = {'Left':0x25,
             'N':0x4E
 }
 
-axis = [0,0]
+#axis = [0,0]
+kernel = np.ones((3, 3), np.uint8)
 
 def init():
     window_name = win32gui.FindWindow(None, TARGET_NAME)
@@ -47,72 +46,70 @@ def action(input,axis):
         time.sleep(.1)
         win32api.keybd_event(CONTROL["Left"], 0, win32con.KEYEVENTF_KEYUP, 0)
         #print("Left")
-        axis[0] -= 1
+        if not axis[0] <= -18:
+            axis[0] -= 1
 
     if input == 1:
         win32api.keybd_event(CONTROL["Right"], 0, 0, 0)
         time.sleep(.1)
         win32api.keybd_event(CONTROL["Right"], 0, win32con.KEYEVENTF_KEYUP, 0)
         #print("Right")
-        axis[0] += 1
+        if not axis[0] >= 18:
+            axis[0] += 1
 
     if  input == 2:
         win32api.keybd_event(CONTROL["Up"], 0, 0, 0)
         time.sleep(.1)
         win32api.keybd_event(CONTROL["Up"], 0, win32con.KEYEVENTF_KEYUP, 0)
         #print("Up")
-        axis[1] += 1
+        if not axis[1] >= 13:
+            axis[1] += 1
 
     if input == 3:
         win32api.keybd_event(CONTROL["Down"], 0, 0, 0)
         time.sleep(.1)
         win32api.keybd_event(CONTROL["Down"], 0, win32con.KEYEVENTF_KEYUP, 0)
         #print("Down")
-        axis[1] -= 1
+        if not axis[1] <= -13:
+            axis[1] -= 1
 
     if input == 4:
-            win32api.keybd_event(CONTROL["Up"], 0, 0, 0)
-            win32api.keybd_event(CONTROL["Left"], 0, 0, 0)
-            time.sleep(.1)
-            win32api.keybd_event(CONTROL["Up"], 0, win32con.KEYEVENTF_KEYUP, 0)
-            win32api.keybd_event(CONTROL["Left"], 0, win32con.KEYEVENTF_KEYUP, 0)
-            #print("Up+Left")
-            axis[0] -= 1
-            axis[1] += 1
-
+        win32api.keybd_event(CONTROL["Up"], 0, 0, 0)
+        win32api.keybd_event(CONTROL["Left"], 0, 0, 0)
+        time.sleep(.1)
+        win32api.keybd_event(CONTROL["Up"], 0, win32con.KEYEVENTF_KEYUP, 0)
+        win32api.keybd_event(CONTROL["Left"], 0, win32con.KEYEVENTF_KEYUP, 0)
+        #print("Up+Left")
+        axis[0] -= 1
+        axis[1] += 1
     if input == 5:
-            win32api.keybd_event(CONTROL["Up"], 0, 0, 0)
-            win32api.keybd_event(CONTROL["Right"], 0, 0, 0)
-            time.sleep(.1)
-            win32api.keybd_event(CONTROL["Up"], 0, win32con.KEYEVENTF_KEYUP, 0)
-            win32api.keybd_event(CONTROL["Right"], 0, win32con.KEYEVENTF_KEYUP, 0)
-            #print("Up+Right")
-            axis[0] += 1
-            axis[1] += 1
-
+        win32api.keybd_event(CONTROL["Up"], 0, 0, 0)
+        win32api.keybd_event(CONTROL["Right"], 0, 0, 0)
+        time.sleep(.1)
+        win32api.keybd_event(CONTROL["Up"], 0, win32con.KEYEVENTF_KEYUP, 0)
+        win32api.keybd_event(CONTROL["Right"], 0, win32con.KEYEVENTF_KEYUP, 0)
+        #print("Up+Right")
+        axis[0] += 1
+        axis[1] += 1
     if input == 6:
-            win32api.keybd_event(CONTROL["Down"], 0, 0, 0)
-            win32api.keybd_event(CONTROL["Left"], 0, 0, 0)
-            time.sleep(.1)
-            win32api.keybd_event(CONTROL["Down"], 0, win32con.KEYEVENTF_KEYUP, 0)
-            win32api.keybd_event(CONTROL["Left"], 0, win32con.KEYEVENTF_KEYUP, 0)
-            #print("Down+Left")
-            axis[0] -= 1
-            axis[1] -= 1
-
+        win32api.keybd_event(CONTROL["Down"], 0, 0, 0)
+        win32api.keybd_event(CONTROL["Left"], 0, 0, 0)
+        time.sleep(.1)
+        win32api.keybd_event(CONTROL["Down"], 0, win32con.KEYEVENTF_KEYUP, 0)
+        win32api.keybd_event(CONTROL["Left"], 0, win32con.KEYEVENTF_KEYUP, 0)
+        #print("Down+Left")
+        axis[0] -= 1
+        axis[1] -= 1
     if input == 7:
-            win32api.keybd_event(CONTROL["Down"], 0, 0, 0)
-            win32api.keybd_event(CONTROL["Right"], 0, 0, 0)
-            time.sleep(.1)
-            win32api.keybd_event(CONTROL["Down"], 0, win32con.KEYEVENTF_KEYUP, 0)
-            win32api.keybd_event(CONTROL["Right"], 0, win32con.KEYEVENTF_KEYUP, 0)
-            #print("Down+Right")
-            axis[0] += 1
-            axis[1] -= 1
-
-        #arrow key end
-
-
+        win32api.keybd_event(CONTROL["Down"], 0, 0, 0)
+        win32api.keybd_event(CONTROL["Right"], 0, 0, 0)
+        time.sleep(.1)
+        win32api.keybd_event(CONTROL["Down"], 0, win32con.KEYEVENTF_KEYUP, 0)
+        win32api.keybd_event(CONTROL["Right"], 0, win32con.KEYEVENTF_KEYUP, 0)
+        # print("Down+Right")
+        axis[0] += 1
+        axis[1] -= 1
+    #arrow key end
     if input == 100:
         win32api.keybd_event(CONTROL["Enter"], 0, 0, 0)
         time.sleep(.05)
@@ -133,135 +130,138 @@ def find_score(hwnd):
     return float(score_text) # float 값으로 리턴한다
 #def end
 
-def is_Activating():
-    active_window = win32gui.GetForegroundWindow()
-    active_window = win32gui.GetWindowText(active_window)
+def padwithtens(vector, pad_width, iaxis, kwargs):
+    vector[:pad_width[0]] = 255
+    vector[-pad_width[1]:] = 255
+    return vector
 
-    if active_window == TARGET_NAME or active_window == RESULT_WINDOW:
-        active_status = True
-    else :
-        active_status = False
-        print("Game is not Activated!!!!")
-    return active_status
-#def end
+def reset_env(axis): # 환경 초기화
+    Result_screen = win32gui.FindWindow(None, RESULT_WINDOW)
+    time.sleep(.1)
+    gamedone()  # N을 눌러 창을 닫는다
+    time.sleep(.05)
 
-def reset_env(): # 환경 초기화
-    #if is_Activating(): # 창이 활성화 중일 떄
-        Result_screen = win32gui.FindWindow(None, RESULT_WINDOW)
-
-        time.sleep(.5)
-        gamedone() # N을 눌러 창을 닫는다
+    if Result_screen:
+        action(1, axis)
         time.sleep(.05)
-        #if end
+        action(100, axis)
+    #if end
 
-        if Result_screen:
-            action(1,axis)
-            time.sleep(.05)
-            action(100,axis)
+    action(100, axis)  # start or skip Game over
+    time.sleep(.05)
+    action(100, axis)  # restart or 그냥 눌러봄
 
-        action(100,axis) #start or skip Game over
-        time.sleep(.05)
-        action(100,axis) #restart or 그냥 눌러봄
+    # first screenshot
+    gameWindow = init()
+    # capture screen
+    sct = mss()
 
-        gameWindow = init()
-        # capture screen
-        sct = mss()
+    sct.get_pixels(gameWindow)
+    img_init = Image.frombytes('RGB', (sct.width, sct.height), sct.image)
+    img_np = np.array(img_init)
+    img_np = cv2.cvtColor(img_np, cv2.COLOR_RGB2GRAY)
+    # dataset downsample to Black & white
+    bw = np.asarray(img_np).copy()
+    bw[bw < 200] = 0  # background
+    bw[bw >= 200] = 255  # bullet
+
+    bw[bw == 0] = 0
+    bw[bw == 255] = 50
+    observation = bw
+
+    for i in range(3):
         sct.get_pixels(gameWindow)
         img_init = Image.frombytes('RGB', (sct.width, sct.height), sct.image)
         img_np = np.array(img_init)
         img_np = cv2.cvtColor(img_np, cv2.COLOR_RGB2GRAY)
-
         # dataset downsample to Black & white
         bw = np.asarray(img_np).copy()
-        bw[bw < 200] = 0
-        bw[bw >= 200] = 255
+        bw[bw < 200] = 0  # background
+        bw[bw >= 200] = 255  # bullet
 
-        obs1 = bw  # return observation data
-        '''
-        sct = mss()
-        sct.get_pixels(gameWindow)
-        img_init = Image.frombytes('RGB', (sct.width, sct.height), sct.image)
-        img_np = np.array(img_init)
-        img_np = cv2.cvtColor(img_np, cv2.COLOR_RGB2GRAY)
+        bw[bw == 0] = 0
+        bw[bw == 255] = 50*i
+        observation += bw
 
-        # dataset downsample to Black & white
-        bw = np.asarray(img_np).copy()
-        bw[bw < 200] = 0
-        bw[bw >= 200] = 255
-        '''
-        obs2 = bw
-        #if end
-        return obs1,obs2
+    observation = np.lib.pad(observation, 1, padwithtens)
+    observation = np.append(axis, observation)
+    observation = np.reshape(observation, (-1,)) #reforming ndarray
+    return observation, axis
 
 def Game_env(action_input,axis):
-    #if is_Activating:
-        #init part
+    # init part
+    gameWindow = init()
+    Result_screen = win32gui.FindWindow(None, RESULT_WINDOW)
+    # capture screen
+    #first screenshot
+    sct = mss()
+    sct.get_pixels(gameWindow)
+    img_init = Image.frombytes('RGB', (sct.width, sct.height), sct.image)
+    img_np = np.array(img_init)
+    img_np = cv2.cvtColor(img_np, cv2.COLOR_RGB2GRAY)
+    bw = np.asarray(img_np).copy()
+    bw[bw < 200] = 0  # background
+    bw[bw >= 200] = 255  # bullet
+
+    bw[bw == 0] = 10
+    bw[bw == 255] = 30
+    observation = bw
+
+    if Result_screen:
+        #결과 하면 검출 시
+        time.sleep(0.05)
+        living_time = find_score(Result_screen)  # 메세지 창에서 점수 추출
         reward = 0
+        done = True
+        observation = np.zeros_like(observation)
+
+    if Result_screen == False:  # if is not done
+        action(action_input, axis)
+        reward = 1
+        living_time = 0
         done = False
-        _ = None
-        gameWindow = init()
-        #capture screen
+        for i in range(3):
+            sct.get_pixels(gameWindow)
+            img_init = Image.frombytes('RGB', (sct.width, sct.height), sct.image)
+            img_np = np.array(img_init)
+            img_np = cv2.cvtColor(img_np, cv2.COLOR_RGB2GRAY)
+            # dataset downsample to Black & white
+            bw = np.asarray(img_np).copy()
+            bw[bw < 200] = 0  # background
+            bw[bw >= 200] = 255  # bullet
 
-        sct = mss()
-        sct.get_pixels(gameWindow)
-        img_init = Image.frombytes('RGB', (sct.width, sct.height), sct.image)
-        img_np = np.array(img_init)
-        img_np = cv2.cvtColor(img_np, cv2.COLOR_RGB2GRAY)
+            bw[bw == 0] = 10
+            bw[bw == 255] = 30*(i+1)
+            observation += bw
 
-        bw = np.asarray(img_np).copy()
-        bw[bw < 200] = 0
-        bw[bw >= 200] = 255
-        obs1 = bw
+    observation = np.lib.pad(observation, 1, padwithtens) # add to Padding
+    observation = np.append(axis,observation)
+    observation = np.reshape(observation, (-1,)) #reforming ndarray
+    return observation, reward, done, living_time, axis
 
-        Result_screen = win32gui.FindWindow(None, RESULT_WINDOW)
-
-        if Result_screen == False: #if is not done
-            action(action_input,axis)
-            '''
-            if axis[0] <= -16 or axis[0] >= 16 or axis[1] <= -12 or axis[1] >= 12:
-                reward = -1.0
-                living_time = 0
-                done = True
-                print("Warning!")
-                time.sleep(5)
-            else:
-                reward = 1.0
-                living_time = 0
-            '''
-            reward = 1.0
-            living_time = 0
-
-        if Result_screen:
-            #스크린 떴을때
-            time.sleep(0.05)
-            living_time = find_score(Result_screen) #메세지 창에서 점수 추출
-            done = True
-
-        obs2 = bw
-        return obs1, obs2, reward, done, living_time, axis
 
 '''
-
 time.sleep(2)
 
 while 1:
         done = False
         time.sleep(2)
-        obs1, obs2 = reset_env()
+        observation,axis = reset_env()
         step = 0
         while not done:
             control_rand = np.random.random_integers(0, 7, None)
-            obs1, obs2, reward, done, _, _  = Game_env(control_rand,axis)
+            observation, reward, done, _, _  = Game_env(control_rand,axis)
             step += 1
             print("-----------------------------------")
             print("step is {}".format(step))
             print("action : {}".format(control_rand))
-            print("Observation : {}".format(obs1))
+            print("Observation : {}".format(observation))
             print("Reward : {}".format(reward))
             print("done : {}".format(done))
-            #print(np.reshape(obs1, (1, -1)).shape)
-            print(obs1.shape)
-            print(np.size(obs1))
-            print("size is : {} x {}".format(np.size(obs1,1),np.size(obs1,0)))
+            print(observation.shape)
             print("-----------------------------------")
+            cv2.imshow('obs1', observation)
+            if cv2.waitKey(25) & 0xFF == ord('q'):
+                cv2.destroyAllWindows()
+
 '''

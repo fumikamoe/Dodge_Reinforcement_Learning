@@ -1,37 +1,15 @@
 # -*- coding: utf-8 -*-
-'''
-import gym
-import numpy as np
-
-env = gym.make('Pong-v0')
-obs_q = []
-act_q = []
-
-for i_episode in range(20):
-    observation = env.reset()
-    for t in range(1000):
-        print("--------------------------------------------------------")
-        #env.render()
-        #print(observation)
-        action = env.action_space.sample()
-        observation, reward, done, info = env.step(action)
-        #print("Obs is : {}".format(observation))
-        print("Act is : {}".format(action))
-        print("rwd is : {}".format(reward))
-        #print(info)
-        print(observation.shape)
-        act_q.append(action)
-        C_obs = np.reshape(observation, (1, -1))
-        print(C_obs.size)
-        print("--------------------------------------------------------")
-        if done:
-            print("Episode finished after {} timesteps".format(t+1))
-            break
-'''
-
 import pickle
 import matplotlib.pyplot as plt
+import win32gui
+import win32api
+import win32con
 import numpy as np
+import cv2
+from mss import mss
+from PIL import Image
+TARGET_NAME = '닷지 1.9'
+
 
 f = open('./progress_result.txt','rb')
 a = pickle.load(f)
@@ -48,7 +26,7 @@ for i in range(len(a)):
 plt.autoscale(enable=True, axis=u'both', tight=False)
 plt.xlabel("EPISODE")
 plt.ylabel("SCORE")
-plt.xticks(np.arange(0, len(a) + 1, 10))
+plt.xticks(np.arange(0, len(a) + 1, 100))
 plt.plot(queue_size, a)
 #plt.scatter(queue_size, a)
 plt.show()
@@ -60,15 +38,16 @@ def init():
     f.close()
     print("==이태까지의 진행 과정을 저장했습니다!==")
 #init()
-'''
-import win32gui
-import win32api
-import win32con
-import numpy as np
-import cv2
-from mss import mss
-from PIL import Image
-TARGET_NAME = '닷지 1.9'
+
+
+
+
+
+def padwithtens(vector, pad_width, iaxis, kwargs):
+    vector[:pad_width[0]] = 255
+    vector[-pad_width[1]:] = 255
+    return vector
+kernel = np.ones((3, 3), np.uint8)
 
 mon = {'top': 160, 'left': 160, 'width': 200, 'height': 200}
 
@@ -94,18 +73,41 @@ while 1:
     sct.get_pixels(init())
     img = Image.frombytes('RGB', (sct.width, sct.height), sct.image)
     img_np = np.array(img)
-
     img_np = cv2.cvtColor(img_np, cv2.COLOR_RGB2GRAY)
-
     bw = np.asarray(img_np).copy()
-    #bw[bw == 255] = 0
     bw[bw < 200] = 0
     bw[bw >= 200] = 255
-    img_np = bw
+    obs1 = bw
+    obs2 = bw
+    observation = bw
+    print("phase1")
 
-    cv2.imshow('test', img_np)
-    print(np.reshape(img_np, (1, -1)).shape)
+    for i in range(3):
+        sct.get_pixels(init())
+        img_init = Image.frombytes('RGB', (sct.width, sct.height), sct.image)
+        img_np = np.array(img_init)
+        img_np = cv2.cvtColor(img_np, cv2.COLOR_RGB2GRAY)
+        # dataset downsample to Black & white
+        bw = np.asarray(img_np).copy()
+        bw[bw < 200] = 0  # background
+        bw[bw >= 200] = 50*i  # bullet
+        obs2 = bw
+        observation += obs2
+        print("phase2")
+
+    #observation = np.lib.pad(observation, 5, padwithtens)
+    cv2.imshow('test', observation)
+
     if cv2.waitKey(25) & 0xFF == ord('q'):
         cv2.destroyAllWindows()
         break
-'''
+
+
+
+a = np.arange(6)
+print(a)
+a = a.reshape((2, 3))
+print(a)
+
+a = np.lib.pad(a, 2, padwithtens)
+print(a)

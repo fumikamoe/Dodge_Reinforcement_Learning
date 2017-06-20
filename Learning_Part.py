@@ -9,23 +9,30 @@ import IO_Part as game
 import time
 from tqdm import tqdm
 import pickle
+import cv2
 
-
+np.set_printoptions(threshold=np.inf)
 def get_options():
     parser = ArgumentParser()
+    parser.add_argument('--FAIL_STUDY', type=bool, default=True,
+                        help='실패 학습을 할것인지')
+
+    parser.add_argument('--SAVE_STEP', type=int, default=50,
+                        help='저장간격')
+
     parser.add_argument('--MAX_EPISODE', type=int, default=1000,
                         help='최대 에피소드를 몇번 반복할건지')
 
-    parser.add_argument('--ACTION_DIM', type=int, default=8,
+    parser.add_argument('--ACTION_DIM', type=int, default=4,
                         help='한번에 몇번 액션을 취할건지')
 
-    parser.add_argument('--OBSERVATION_DIM', type=int, default=120198,
+    parser.add_argument('--OBSERVATION_DIM', type=int, default=121606,
                         help='한번에 볼 수 있는 상태의 수')
 
     parser.add_argument('--GAMMA', type=float, default=0.95,
                         help='Q Learning에서의 감산 펙터')
 
-    parser.add_argument('--INIT_EPS', type=float, default=0.9,
+    parser.add_argument('--INIT_EPS', type=float, default=0.5,
                         help='무작위 표본 추출 작업에 대한 초기 확률')
 
     parser.add_argument('--FINAL_EPS', type=float, default=1e-5,
@@ -34,25 +41,28 @@ def get_options():
     parser.add_argument('--EPS_DECAY', type=float, default=0.95,
                         help='엡실론 감쇠율')
 
-    parser.add_argument('--EPS_ANNEAL_STEPS', type=int, default=10,
+    parser.add_argument('--EPS_INC', type=float, default=1.1,
+                        help='엡실론 증가율')
+
+    parser.add_argument('--EPS_ANNEAL_STEPS', type=int, default=64,
                         help='엡실론 감쇠를 위한 간격 단계')
 
-    parser.add_argument('--LR', type=float, default=1e-4,
+    parser.add_argument('--LR', type=float, default=0.05,#1e-4,n
                         help='학습 비율')
 
-    parser.add_argument('--MAX_EXPERIENCE', type=int, default=1024,
+    parser.add_argument('--MAX_EXPERIENCE', type=int, default=512,
                         help='경험 재생 메모리의 크기')
 
     parser.add_argument('--BATCH_SIZE', type=int, default=128,
                         help='미니 배치의 크기')
 
-    parser.add_argument('--H1_SIZE', type=int, default=512,
+    parser.add_argument('--H1_SIZE', type=int, default=1024,
                         help='히든 레이어 1의 크기')
 
     parser.add_argument('--H2_SIZE', type=int, default=512,
                         help='히든 레이어 2의 크기')
 
-    parser.add_argument('--H3_SIZE', type=int, default=256,
+    parser.add_argument('--H3_SIZE', type=int, default=512,
                         help='히든 레이어 3의 크기')
 
     parser.add_argument('--H4_SIZE', type=int, default=256,
@@ -85,6 +95,7 @@ def get_options():
     options = parser.parse_args()
     return options
 
+
 '''
 option은 각족 여러가지 선언이나 정의가 되어있는 곳입니다. 각 선언마다 help가 적혀있으므로 따로 설명하지는 않겠습니다. 그 중에서 DNN을 정의하는 부분에 대해서는 설명할 필요가 있을 것 같습니다. 작성자는 다음 홈페이지를 참고해서 neural network를 구성했다고 합니다.
 http://www.nervanasys.com/demystifying-deep-reinforcement-learning/
@@ -99,15 +110,8 @@ dθ/dt : rate of change of the angle
 
 
 class QAgent:
-
     # A naive neural network with 3 hidden layers and relu as non-linear function.
-    def __init__(self, options): # 초기화 부분
-
-        self.W_conv1 = self.weight_variable([5, 5, 1, options.C1_SIZE])
-        self.B_conv1 = self.bias_variable([options.C1_SIZE])
-
-        self.W_conv2 = self.weight_variable([5, 5, options.C1_SIZE, options.C2_SIZE])
-        self.B_conv2 = self.bias_variable([options.C2_SIZE])
+    def __init__(self, options):  # 초기화 부분
 
         self.W1 = self.weight_variable([options.OBSERVATION_DIM, options.H1_SIZE])
         self.b1 = self.bias_variable([options.H1_SIZE])
@@ -133,7 +137,6 @@ class QAgent:
         self.W8 = self.weight_variable([options.H7_SIZE, options.ACTION_DIM])
         self.b8 = self.bias_variable([options.ACTION_DIM])
 
-
     '''
     Q Agent class. 멘 처음 텐서플로우를 초기화 하는 부분
     3개의 hiddenlayer를 가진 Neural Network생성 W1,2,3,4는 weight, B1,2,3,4는 Bias를 나타냄
@@ -145,7 +148,8 @@ class QAgent:
         if len(shape) == 1:
             dim_sum += 1
         bound = np.sqrt(6.0 / dim_sum)
-        return tf.random_uniform(shape, minval=-bound, maxval=bound) # bound 절대값을 중심으로 Random 형태로 반환
+        return tf.random_uniform(shape, minval=-bound, maxval=bound)  # bound 절대값을 중심으로 Random 형태로 반환
+
     '''
     세개의 Hidden Layer 존재. 각 layer사이에는 Weight 행렬 존재 w1,2,3인데 이걸 초기화 해주는 단계
     초기화 방법으론 Xavier Initializition을 사용
@@ -160,49 +164,37 @@ class QAgent:
     '''
 
     # Tool function to create weight variables
-    def weight_variable(self, shape): # Weight 초기화
-        return tf.Variable(self.xavier_initializer(shape)) # Weight을 xavier로 초기화 하여 리턴
+    def weight_variable(self, shape):  # Weight 초기화
+        return tf.Variable(self.xavier_initializer(shape))  # Weight을 xavier로 초기화 하여 리턴
 
     # Tool function to create bias variables
-    def bias_variable(self, shape): # Bias 초기화
-        return tf.Variable(self.xavier_initializer(shape)) # Bias를 xavier로 초기화 하여 리턴
+    def bias_variable(self, shape):  # Bias 초기화
+        return tf.Variable(self.xavier_initializer(shape))  # Bias를 xavier로 초기화 하여 리턴
+
     '''
     실제 Bias와 Weight를 xavier로 초기화 시켜주는 함수
     '''
 
-    def conv2d(self,x,W):
-        return tf.nn.conv2d(x,W,strides=[1,1,1,1], padding='SAME')
-
-    def max_pool_2x2(self,x):
-        return tf.nn.max_pool(x, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME')
-
     # Add options to graph
     def add_value_net(self, options):
-        '''
-        x_image = tf.reshape(x,[-1,28,28,1])
-        h_conv1 = tf.nn.relu(self.conv2d(x_image, self.W_conv1)+ self.B_conv1)
-        h_pool1 = self.max_pool_2x2(h_conv1)
-
-        h_conv2 = tf.nn.relu(self.conv2d(h_pool1,self.W_conv2) + self.B_conv2)
-        h_pool2 = self.max_pool_2x2(h_conv2)
-        '''
-        observation = tf.placeholder(tf.float32, [None, options.OBSERVATION_DIM]) # Place holder로 observation으로 값을 넣음.
-        _h1 = tf.nn.relu(tf.matmul(observation, self.W1) + self.b1) # ReLu는 활성화 함수
-        h1 = tf.nn.dropout(_h1, options.DROPOUT_RATE)
-        _h2 = tf.nn.relu(tf.matmul(h1, self.W2) + self.b2)
-        h2 = tf.nn.dropout(_h2, options.DROPOUT_RATE)
-        _h3 = tf.nn.relu(tf.matmul(h2, self.W3) + self.b3)
-        h3 = tf.nn.dropout(_h3, options.DROPOUT_RATE)
-        _h4 = tf.nn.relu(tf.matmul(h3, self.W4) + self.b4)
-        h4 = tf.nn.dropout(_h4, options.DROPOUT_RATE)
-        _h5 = tf.nn.relu(tf.matmul(h4, self.W5) + self.b5)
-        h5 = tf.nn.dropout(_h5, options.DROPOUT_RATE)
-        _h6 = tf.nn.relu(tf.matmul(h5, self.W6) + self.b6)
-        h6 = tf.nn.dropout(_h6, options.DROPOUT_RATE)
-        _h7 = tf.nn.relu(tf.matmul(h6, self.W7) + self.b7)
-        h7 = tf.nn.dropout(_h7, options.DROPOUT_RATE)
+        observation = tf.placeholder(tf.float32, [None, options.OBSERVATION_DIM])  # Place holder로 observation으로 값을 넣음.
+        h1 = tf.nn.relu(tf.matmul(observation, self.W1) + self.b1)  # ReLu는 활성화 함수
+        # h1 = tf.nn.dropout(_h1, options.DROPOUT_RATE)
+        h2 = tf.nn.relu(tf.matmul(h1, self.W2) + self.b2)
+        # h2 = tf.nn.dropout(_h2, options.DROPOUT_RATE)
+        h3 = tf.nn.relu(tf.matmul(h2, self.W3) + self.b3)
+        # h3 = tf.nn.dropout(_h3, options.DROPOUT_RATE)
+        h4 = tf.nn.relu(tf.matmul(h3, self.W4) + self.b4)
+        # h4 = tf.nn.dropout(_h4, options.DROPOUT_RATE)
+        h5 = tf.nn.relu(tf.matmul(h4, self.W5) + self.b5)
+        # h5 = tf.nn.dropout(_h5, options.DROPOUT_RATE)
+        h6 = tf.nn.relu(tf.matmul(h5, self.W6) + self.b6)
+        # h6 = tf.nn.dropout(_h6, options.DROPOUT_RATE)
+        h7 = tf.nn.relu(tf.matmul(h6, self.W7) + self.b7)
+        # h7 = tf.nn.dropout(_h7, options.DROPOUT_RATE)
         Q = tf.squeeze(tf.matmul(h7, self.W8) + self.b8)
         return observation, Q
+
     '''
     http://pythonkim.tistory.com/40
     Backward 연산에서 결과를 전달할 때 Sigmoid를 사용 근대 sigmoid는 값이 0에서 1사이에서 심하게 변형을 함
@@ -234,21 +226,22 @@ class QAgent:
     (왜 들어간지 모르겠음)
 
     '''
+
     # Sample action with random rate eps
     # 액션을 뽑아주는 함수
-    def sample_action(self, Q, feed, eps, options): # 위에서 정의한 Q, feed, Epsilon, options를 받아와서 action을 정의해줌
+    def sample_action(self, Q, feed, eps, options):  # 위에서 정의한 Q, feed, Epsilon, options를 받아와서 action을 정의해줌
 
-        act_values = Q.eval(feed_dict=feed) # Feed를 먹이고 Q를 실행하여 나온 값(Q value)을 act_value에 삽입
-        if random.random() <= eps: # 랜덤 값을 생성해서 epsilon 보다 작으면 random action을 수행
+        act_values = Q.eval(feed_dict=feed)  # Feed를 먹이고 Q를 실행하여 나온 값(Q value)을 act_value에 삽입
+        if random.random() <= eps:  # 랜덤 값을 생성해서 epsilon 보다 작으면 random action을 수행
             # action_index = env.action_space.sample() #openAI Gym에서 샘플 액션을 받아올 때 사용
-            action_index = random.randrange(options.ACTION_DIM) #ACTION_DIM 크기만큼에서 랜덤 한 수를 추출하여 action_index로
-        else: # epsilon 보다 크다면
-            action_index = np.argmax(act_values) #act_values에 저장된 Q Value 중에서 좀 더 큰 Q value를 갖는 action을 선택
+            action_index = random.randrange(options.ACTION_DIM)  # ACTION_DIM 크기만큼에서 랜덤 한 수를 추출하여 action_index로
+        else:  # epsilon 보다 크다면
+            action_index = np.argmax(act_values)  # act_values에 저장된 Q Value 중에서 좀 더 큰 Q value를 갖는 action을 선택
             # Argmax는 f(x)에서 f(x)를 최대값을 가지게하는 x값을 찾는 함수
-        action = np.zeros(options.ACTION_DIM) # Action이란 리스트를 생성후 ACTION_DIM 만큼 0으로 채운다
-        action[action_index] = 1 # Action_index 넘버의 Action 리스트를 1로 변경
+        action = np.zeros(options.ACTION_DIM)  # Action이란 리스트를 생성후 ACTION_DIM 만큼 0으로 채운다
+        action[action_index] = 1  # Action_index 넘버의 Action 리스트를 1로 변경
 
-        return action #Action 리스트를 반환한다
+        return action  # Action 리스트를 반환한다
 
     '''
     액션을 뽑아주는 함수 위에서 정의한 Q, feed, Epsilon, options을 받아와서 action을 정의해줌
@@ -289,39 +282,42 @@ class QAgent:
 
     '''
 
+
 class progress():
     def open(self):
-        f = open('./Progress_result.txt','rb')
+        f = open('./Progress_result.txt', 'rb')
         episode = pickle.load(f)
         f.close()
         return episode
 
     def save(survive_time):
         survive_result = []
-        survive_result= progress.open(0)
-        #survive_result = survive_time
+        survive_result = progress.open(0)
+        # survive_result.extend(survive_time)
         survive_result.append(survive_time)
-        #To save
-        f = open('./Progress_result.txt','wb')
-        pickle.dump(survive_result,f)
+        # To save
+        f = open('./Progress_result.txt', 'wb')
+        pickle.dump(survive_result, f)
         f.close()
         print("==이태까지의 진행 과정을 저장했습니다!==")
-#save class end
+
+
+# save class end
 
 # 실제적인 학습 부분
 
 def train(env):
     # Define placeholders to catch inputs and add options
-    options = get_options() # 위에서 정의한 get_options()를 통해 옵션을 정의함
-    agent = QAgent(options) # QAgent class를 생성하여 agent라는 이름으로 넣음
-    sess = tf.InteractiveSession() # Interactive Session을 생성
-    obs, Q1 = agent.add_value_net(options) # Observation을 넣으면 Q value가 나오는 함수 add_value_net 형태만 지정해줌
-    act = tf.placeholder(tf.float32, [None, options.ACTION_DIM]) #float32 타입으로 ACTION_DIM 크기로 action 크기 결정
-    rwd = tf.placeholder(tf.float32, [None, ]) # reward 크기 결정
-    next_obs, Q2 = agent.add_value_net(options) # Observation을 넣으면 Q value가 나오는 함수 add_value_net 형태만 지정해줌. Q1과 같은 형태
+    options = get_options()  # 위에서 정의한 get_options()를 통해 옵션을 정의함
+    agent = QAgent(options)  # QAgent class를 생성하여 agent라는 이름으로 넣음
+    sess = tf.InteractiveSession()  # Interactive Session을 생성
+    obs, Q1 = agent.add_value_net(options)  # Observation을 넣으면 Q value가 나오는 함수 add_value_net 형태만 지정해줌
+    act = tf.placeholder(tf.float32, [None, options.ACTION_DIM])  # float32 타입으로 ACTION_DIM 크기로 action 크기 결정
+    rwd = tf.placeholder(tf.float32, [None, ])  # reward 크기 결정
+    next_obs, Q2 = agent.add_value_net(options)  # Observation을 넣으면 Q value가 나오는 함수 add_value_net 형태만 지정해줌. Q1과 같은 형태
     values1 = tf.reduce_sum(tf.multiply(Q1, act), reduction_indices=1)
     values2 = rwd + options.GAMMA * tf.reduce_max(Q2, reduction_indices=1)
-    # reduction_indices=1 는 행끼리 처리하라는 reduce 연산의 옵션
+    # reduction_indices=1 는 행끼리 처리하라는 rednuce 연산의 옵션
     loss = tf.reduce_mean(tf.square(values1 - values2))
     '''
     [Deep Q Learning with Experience Replay]
@@ -343,9 +339,9 @@ def train(env):
     거기에 momentum효과를 더하면 그것이 Adam optimizer가 됩니다.
     Loss를 최소화 하는 방향으로 Learning rate(1e-4)를 가지고 Adam 최적화 알고리즘을 사용하여 학습한 결과를 train.step에 저장
     '''
-    sess.run(tf.global_variables_initializer()) # 모든 변수를 초기화 해주는 부분
+    sess.run(tf.global_variables_initializer())  # 모든 변수를 초기화 해주는 부분
 
-    #network 저장 로드 부분
+    # network 저장 로드 부분
     saver = tf.train.Saver()
     checkpoint = tf.train.get_checkpoint_state("checkpoints")
     if checkpoint and checkpoint.model_checkpoint_path:
@@ -361,34 +357,42 @@ def train(env):
     saver.restore(sess, "/tmp/model.ckpt")
     같은 식으로 사용
     '''
-    #로컬 변수에 대한 초기화 및 정의
+    # 로컬 변수에 대한 초기화 및 정의
     feed = {}
     eps = options.INIT_EPS
-    global_step = 0 # global step 정의 및 초기화
-    exp_pointer = 0 # queue의 순서를 나타내는 포인터
+    global_step = 0  # global step 정의 및 초기화
+    exp_pointer = 0  # queue의 순서를 나타내는 포인터
+
     '''
     experience reply를 할때 같은 episode안에서 순서대로 학습하면 편향되는 효과를 가짐
     MAX_EXPRIENCE를 정의하고 거기에 training set을 하나씩 저장해서 랜덤으로 추출하여 학습
     training set은 obs, act, rwd, next_obs queue로 이루어져있음.
     '''
     # The replay memory
-    obs_queue = np.empty([options.MAX_EXPERIENCE, options.OBSERVATION_DIM])  #행이 MAX_EXPERIENCE이고 열이 OBSERVATION_DIM인 빈 행렬을 생성
+    obs_queue = np.empty(
+        [options.MAX_EXPERIENCE, options.OBSERVATION_DIM])  # 행이 MAX_EXPERIENCE이고 열이 OBSERVATION_DIM인 빈 행렬을 생성
     act_queue = np.empty([options.MAX_EXPERIENCE, options.ACTION_DIM])
     rwd_queue = np.empty([options.MAX_EXPERIENCE])
     next_obs_queue = np.empty([options.MAX_EXPERIENCE, options.OBSERVATION_DIM])
-    CNN_queue = np.empty([options.MAX_EXPERIENCE,1])
+    # CNN_queue = np.empty([options.MAX_EXPERIENCE,1])
 
-    temp_obs_queue = np.empty([options.MAX_EXPERIENCE, options.OBSERVATION_DIM])   #학습 되는 내용을 저장하기 위해
+    temp_obs_queue = np.empty([options.MAX_EXPERIENCE, options.OBSERVATION_DIM])  # 학습 되는 내용을 저장하기 위해
     temp_act_queue = np.empty([options.MAX_EXPERIENCE, options.ACTION_DIM])
     temp_rwd_queue = np.empty([options.MAX_EXPERIENCE])
     temp_next_obs_queue = np.empty([options.MAX_EXPERIENCE, options.OBSERVATION_DIM])
 
+    if options.FAIL_STUDY:
+        f_obs_queue = np.empty([options.MAX_EXPERIENCE, options.OBSERVATION_DIM])
+        f_act_queue = np.empty([options.MAX_EXPERIENCE, options.ACTION_DIM])
+        f_rwd_queue = np.empty([options.MAX_EXPERIENCE])
+        f_next_obs_queue = np.empty([options.MAX_EXPERIENCE, options.OBSERVATION_DIM])
+        f_pointer = 0
 
     living_time_queue = []
-    #i_episode = 0
+    # i_episode = 0
     open_data = int(len(progress.open(0)))
     if open_data > 1:
-        i_episode = open_data * 50
+        i_episode = open_data * options.SAVE_STEP
     else:
         i_episode = open_data
     print("==이태까지의 진행 상황을 읽어옵니다!==")
@@ -396,142 +400,92 @@ def train(env):
 
     # 에피소드 루프 정의
     while 1:
-        obs1, obs2 = game.reset_env()
-        #observation = np.append(obs1,obs2)
-        observation = obs1
-        converted_observation = np.reshape(observation, (1, -1))
-        learn_obs = np.reshape(converted_observation, (-1,)) #차원을 낮춘다
-        done = False # episode가 끝나기 전까진 done = false
+        axis = [0, 0]
+        observation, axis = game.reset_env(axis)
+        done = False  # episode가 끝나기 전까진 done = false
         sum_loss_value = 0
         temp_pointer = 0
         living_time = 0
-        axis=[0,0]
-        boundray_contact = False
         score = 0
+        eps_save = eps
 
-        #Exp Loop
-        while not done: #에피소드가 끝나지 않았다면
-            global_step += 1 #global step을 1 더해주고
-            #if i_episode % options.EPS_ANNEAL_STEPS == 0 and eps > options.FINAL_EPS:
+        # Exp Loop
+        while not done:  # 에피소드가 끝나지 않았다면
+            global_step += 1  # global step을 1 더해주고
+
+            # if i_episode % options.EPS_ANNEAL_STEPS == 0 and eps > options.FINAL_EPS:
             if global_step % options.EPS_ANNEAL_STEPS == 0 and eps > options.FINAL_EPS:
-                #에피소드가 EPS_ANNEAL_STEPS를 지날때마다 그리고 엡실론이 최종 엡실론 보다 크면
-                eps = eps * options.EPS_DECAY # 엡실론에 감쇠 비율을 적용한다
-            #if end
-            temp_obs_queue[temp_pointer] = learn_obs # Observation 값을 obs_queue에 저장 exp_pointer는 큐의 순서를 지칭함
-            '''
-            action은 agent 클래스 QAgent(options) 에서 sample_action 함수를 통해서 결정
-            Epsilon greedy하게 현재 observation이 DQN을 통과하여 나온 Q값을 바탕으로 action을 결정함)
+                # 에피소드가 EPS_ANNEAL_STEPS를 지날때마다 그리고 엡실론이 최종 엡실론 보다 크면
+                eps = eps * options.EPS_DECAY  # 엡실론에 감쇠 비율을 적용한다
+            # if end
 
-            def sample_action(self, Q, feed, eps, options)
-            Q는 Q1. Q1은 agent.add_value_net(options) 에서 나온 결과값.
-
-            add_value_net는 Q Agent 초기화 부분에서 W1,B1... 등 클래스 그 자신을 가져와서 수행
-            Feed는 obs에
-            '''
-            converted_observation = np.reshape(observation, (1,-1))
-            action = agent.sample_action(Q1, {obs: converted_observation}, eps, options)  # Action 추출
-            action = np.argmax(action)
-            #print("converted_observation :{}".format(converted_observation.shape))
-            #print("observation :{}".format(observation.shape))
-            #print("learn_observation :{}".format(learn_obs.shape))
-
-            obs1, obs2, reward, done, living_time, axis = game.Game_env(action,axis)
-            #OpenAI Gym. _는 info 부분. argmax는 최대 구성요소의 인덱스를 반환합니다
-            #viewing observation
-            if living_time == 0:
-                boundray_contact = True
-
-            #cv2.imshow('obs1', obs1)
-            #if cv2.waitKey(25) & 0xFF == ord('q'):
-            #    cv2.destroyAllWindows()
-
-            #cv2 end
-
-            #observation = np.append
-
-
+            temp_obs_queue[temp_pointer] = observation  # Observation 값을 obs_queue에 저장 exp_pointer는 큐의 순서를 지칭함
+            action = agent.sample_action(Q1, {obs: np.reshape(observation, (1,-1))}, eps, options)  # Action 추출
+            observation, reward, done, living_time, axis = game.Game_env(np.argmax(action), axis)
 
             score += reward
             reward = score
-            print("reward is : {}".format(reward))
-            # (obs1,obs2)
-            observation = obs1
-            learn_obs = np.reshape(observation, (-1,))
 
-            if done and living_time <= 10: #done이 뜬 값
-                reward = -200
-                learn_obs = np.zeros_like(learn_obs)
-            #if done end
+            if done:  # done이 뜬 값
+                reward = -500
+                observaiton = np.zeros_like(observation)
+                f_obs_queue[f_pointer] = temp_obs_queue[temp_pointer]
+                f_act_queue[f_pointer] = action
+                f_rwd_queue[f_pointer] = reward
+                f_next_obs_queue[f_pointer] = observation
+                f_pointer += 1
+            # if end
             temp_act_queue[temp_pointer] = action
-            temp_next_obs_queue[temp_pointer] = learn_obs  # Onbservation을 저장하고
+            temp_next_obs_queue[temp_pointer] = observation  # Onbservation을 저장하고
             temp_rwd_queue[temp_pointer] = reward  # reward queue에 reward 값을 넣고
             temp_pointer += 1  # queue의 index pointer를 1 증가시킨다
-        #step loop 종료
+            
+            if axis[0] <= -14 or axis[0] >= 14 or axis[1] <= -10 or axis[1] >= 10 and eps <= 0.5:
+                eps = eps * options.EPS_INC
+                print("EPS Increase.")
+        # step loop 종료
+        if eps > eps_save:
+            eps = eps_save + (eps-eps_save)/10
 
-
-        #스코어 누적 과정
+        # 스코어 누적 과정
         for i in range(temp_pointer):
-                if exp_pointer != options.MAX_EXPERIENCE:
-                    if living_time >= 0:
-                        obs_queue[exp_pointer] = temp_obs_queue[i]
-                        act_queue[exp_pointer] =  temp_act_queue[i]
-                        next_obs_queue[exp_pointer] =  temp_next_obs_queue[i]
-                        rwd_queue[exp_pointer] = temp_rwd_queue[i]
-                        exp_pointer += 1
-                #exp_point if end
-                else:
-                    break
-                        # for end
+            if exp_pointer != options.MAX_EXPERIENCE:
+                if living_time >= 0:
+                    obs_queue[exp_pointer] = temp_obs_queue[i]
+                    act_queue[exp_pointer] = temp_act_queue[i]
+                    next_obs_queue[exp_pointer] = temp_next_obs_queue[i]
+                    rwd_queue[exp_pointer] = temp_rwd_queue[i]
+                    exp_pointer += 1
+            # exp_point if end
+            else:
+                break
+        # for end
 
-                # Print Result
-        print("====== Episode = {}, Survive time = {}, Exp size = {} ======".format(i_episode, living_time, exp_pointer))
+        #init part
+        temp_pointer = 0
+        temp_obs_queue = np.empty([options.MAX_EXPERIENCE, options.OBSERVATION_DIM])
+        temp_act_queue = np.empty([options.MAX_EXPERIENCE, options.ACTION_DIM])
+        temp_rwd_queue = np.empty([options.MAX_EXPERIENCE])
+        temp_next_obs_queue = np.empty([options.MAX_EXPERIENCE, options.OBSERVATION_DIM])
+
         living_time_queue.append(living_time)
-        '''
-        # Learn Part
-        if exp_pointer == options.MAX_EXPERIENCE:
-            print("====== {} ======".format(time.ctime()))
-            print("학습을 시작합니다.")
-            for _ in tqdm(range(temp_pointer)):
-                rand_indexs = np.random.choice(options.MAX_EXPERIENCE, options.BATCH_SIZE)
-                # max_exprience에서 batch size만큼 랜덤으로 추출하여 rand indexs에 넣는다
-                feed.update({obs: obs_queue[rand_indexs]})
-                feed.update({act: act_queue[rand_indexs]})
-                feed.update({rwd: rwd_queue[rand_indexs]})
-                feed.update({next_obs: next_obs_queue[rand_indexs]})
-                # 랜덤한 indexs에 따라 각각 obs,act,rwd,next obs를 update
-                step_loss_value, _ = sess.run([loss, train_step], feed_dict=feed)
-                # Use sum to calculate average loss of this episode
-                sum_loss_value += step_loss_value
-                # feed를 먹이고 loss함수를 가지고 train_step을 진행. 그 값을 step_loss_value로 저장한다
-                np.delete(obs_queue, [rand_indexs])
-                np.delete(act_queue, [rand_indexs])
-                np.delete(rwd_queue, [rand_indexs])
-                np.delete(next_obs_queue, [rand_indexs])
-            # for end
-            exp_pointer = 0  # 학습 포인터 초기화
-            print("====== {} ======".format(time.ctime()))
-            print("학습 완료!")
 
-            #저장부분
-            saver.save(sess, './checkpoints/' + 'dqn', global_step=global_step)  # ./checkpoints/ 폴더에 저장
-            #print("== 신경망을저장했습니다!!==")  # save!라고 말함
-            i_episode += 1
-            living_time = 0
-
-            for i in range(len(living_time_queue)):
-                living_time += living_time_queue[i]
-
-            living_time = living_time / len(living_time_queue)
+        if f_pointer >= options.BATCH_SIZE: #fail study
+            rand_indexs = np.random.choice(f_pointer, options.BATCH_SIZE)
+            # max_exprience에서 batch size만큼 랜덤으로 추출하여 rand indexs에 넣는다
+            feed.update({obs: obs_queue[rand_indexs]})
+            feed.update({act: act_queue[rand_indexs]})
+            feed.update({rwd: rwd_queue[rand_indexs]})
+            feed.update({next_obs: next_obs_queue[rand_indexs]})
+            # 랜덤한 indexs에 따라 각각 obs,act,rwd,next obs를 update
+            step_loss_value, _ = sess.run([loss, train_step], feed_dict=feed)
+            # Use sum to calculate average loss of this episode
+            sum_loss_value += step_loss_value
+            f_pointer = 0
             print("====== {} ======".format(time.ctime()))
-            print("====== Episode {} end, average survive time is {}======".format(i_episode, living_time))
-            progress.save(living_time)
-            living_time_queue = []
-            if i_episode % 20 == 0 and eps < options.FINAL_EPS:
-                eps = options.INIT_EPS # 저장하면 엡실론 초기화
-            #저장부분 끝
-        #Learn Part end
-        '''
-        if global_step >= options.MAX_EXPERIENCE:
+            print("====== Fail study======")
+
+        if global_step >= options.MAX_EXPERIENCE:  # Learn Part
             rand_indexs = np.random.choice(options.MAX_EXPERIENCE, options.BATCH_SIZE)
             # max_exprience에서 batch size만큼 랜덤으로 추출하여 rand indexs에 넣는다
             feed.update({obs: obs_queue[rand_indexs]})
@@ -543,8 +497,12 @@ def train(env):
             # Use sum to calculate average loss of this episode
             sum_loss_value += step_loss_value
             # feed를 먹이고 loss함수를 가지고 train_step을 진행. 그 값을 step_loss_value로 저장한다
+        # if end
+        print("====== Episode : {}, Survive time : {}, score : {} avg loss : {} ======".format(i_episode, living_time,
+                                                                                               score,
+                                                                                               sum_loss_value / score))
 
-        if i_episode % 50 == 0 and global_step >= options.MAX_EXPERIENCE:
+        if i_episode % options.SAVE_STEP == 0 and global_step >= options.MAX_EXPERIENCE:
             # 저장부분
             saver.save(sess, './checkpoints/' + 'dqn', global_step=global_step)  # ./checkpoints/ 폴더에 저장
             print("== 신경망을저장했습니다!!==")  # save!라고 말함
@@ -559,20 +517,21 @@ def train(env):
             print("====== average survive time is {}======".format(living_time))
             progress.save(living_time)
             living_time_queue = []
+            print("====== 현재 앱실론 {} ======".format(eps))
+            if living_time <= 3.0 and eps <= options.FINAL_EPS:
+                eps = options.INIT_EPS
+                print("====== {} ======".format(time.ctime()))
+                print("====== 엡실론 초기화 ======")
+        # save end
 
-        #save end
-        if exp_pointer == options.MAX_EXPERIENCE:
+        if exp_pointer >= options.MAX_EXPERIENCE:
             exp_pointer = 0
             print("====== {} ======".format(time.ctime()))
             print("====== Exp pointer 초기화 ======")
-        if i_episode % 500 == 0:
-            eps = options.INIT_EPS
-            print("====== {} ======".format(time.ctime()))
-            print("====== 엡실론 초기화 ======")
         i_episode += 1
-    #episode end
+        # episode end
 
-#train end
+# train end
 
 if __name__ == "__main__":
     train(game)
